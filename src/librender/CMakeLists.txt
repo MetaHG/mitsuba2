@@ -39,6 +39,7 @@ add_library(mitsuba-render-obj OBJECT
   ${INC_DIR}/microfacet.h
   ${INC_DIR}/records.h
   ${INC_DIR}/volume_texture.h
+  ${INC_DIR}/lighttree.h
 
   bsdf.cpp         ${INC_DIR}/bsdf.h
   emitter.cpp      ${INC_DIR}/emitter.h

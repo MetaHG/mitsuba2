@@ -5,6 +5,7 @@
 #include <mitsuba/render/scene.h>
 #include <mitsuba/render/kdtree.h>
 #include <mitsuba/render/integrator.h>
+#include <mitsuba/render/lighttree.h>
 #include <enoki/stl.h>
 
 #if defined(MTS_ENABLE_EMBREE)
@@ -96,6 +97,17 @@ MTS_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props) {
     // Create emitters' shapes (environment luminaires)
     for (Emitter *emitter: m_emitters)
         emitter->set_scene(this);
+
+    // Check that all surface emitters are associated with a shape
+    for (const Emitter *emitter : surface_emitters_to_check) {
+        if (!emitter->shape())
+            Throw("Surface emitter was not attached to any shape: %s", emitter);
+    }
+
+    LightTree tree = LightTree<Float, Spectrum, ScalarBoundingBox3f>(m_emitters);
+    std::cerr << "BEFORE TREE PRINT" << std::endl;
+    std::cerr << tree.to_string() << std::endl; //TODO: Fix this function? Works with valgrind, but segmentation fault without ?
+    std::cerr << "AFTER TREE PRINT" << std::endl;
 }
 
 MTS_VARIANT Scene<Float, Spectrum>::~Scene() {
