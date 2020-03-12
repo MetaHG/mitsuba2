@@ -9,6 +9,9 @@
 #include <mitsuba/render/fwd.h>
 #include <mitsuba/render/interaction.h>
 
+#include <fstream>
+#include <filesystem>
+
 NAMESPACE_BEGIN(mitsuba)
 
 
@@ -84,6 +87,10 @@ public:
     std::string to_string() const override {
         std::cout << "LighTree: Printing tree.." << std::endl;
         return m_tree->to_string();
+    }
+
+    void to_obj() {
+        m_tree->to_obj(0, 0);
     }
 
 protected:
@@ -174,6 +181,18 @@ protected:
             return oss.str();
         }
 
+        void to_obj(int left_str, int right_str) {
+            if (m_left) {
+                m_left->to_obj(left_str + 1, right_str);
+            }
+
+            save_to_obj(left_str, right_str);
+
+            if (m_right) {
+                m_right->to_obj(left_str, right_str + 1);
+            }
+        }
+
     private:
         bool is_leaf() {
             return m_right && m_left;
@@ -181,6 +200,28 @@ protected:
 
         float compute_weight() {
             return m_intensity;
+        }
+
+        void save_to_obj(int left_str, int right_str) {
+            std::string dir_name = "lighttree_bboxes";
+            std::ostringstream oss;
+            oss << dir_name << "/l" << left_str << "_r" << right_str << ".obj";
+
+            std::filesystem::path dir(dir_name);
+            if (!std::filesystem::exists(dir)) {
+                std::filesystem::create_directory(dir);
+            }
+
+            std::ofstream ofs(oss.str(), std::ofstream::out);
+
+            for (size_t i = 0; i < 8; i++) { // Magic number here: TODO DEFINE: 8 = number of corners in bounding box
+                Point p = m_bbox.corner(i);
+                ofs << "v " << p.x() << " " << p.y() << " " << p.z() << std::endl;
+            }
+
+            // TODO: See if faces declaration are necessary
+
+            ofs.close();
         }
 
 
@@ -218,9 +259,6 @@ protected:
             }
 
             LightNode* newCluster = new LightNode(best_n1, best_n2, std::rand()); // Wanted to use independent sampler here, but didn't manage to import it...
-//            bool isPresentN1 = leaves_set.find(best_n1) != leaves_set.end();
-//            bool isPresentN2 = leaves_set.find(best_n2) != leaves_set.end();
-//            std::cout << "Is n1 present " << isPresentN1 << ", Is n2 present " << isPresentN2 << std::endl;
 
             leaves_set.erase(best_n1);
             leaves_set.erase(best_n2);
@@ -229,7 +267,7 @@ protected:
             root = newCluster;
         }
 
-        std::cout << "LightTree: Finished" << std::endl;
+        std::cout << "LightTree: Build Finished" << std::endl;
 
         return root;
     }
