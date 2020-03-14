@@ -104,7 +104,7 @@ MTS_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props) {
     std::cerr << m_lighttree->to_string() << std::endl;
 
     // DEBUG
-    // tree.to_obj();
+    // m_lighttree->to_obj();
 }
 
 MTS_VARIANT Scene<Float, Spectrum>::~Scene() {

@@ -58,7 +58,7 @@ public:
     }
 
     void to_obj() {
-        m_tree->to_obj(0, 0);
+        m_tree->to_obj("_");
     }
 
 protected:
@@ -160,15 +160,15 @@ protected:
             return oss.str();
         }
 
-        void to_obj(int left_str, int right_str) {
+        void to_obj(std::string str) {
             if (m_left) {
-                m_left->to_obj(left_str + 1, right_str);
+                m_left->to_obj(str + "l");
             }
 
-            save_to_obj(left_str, right_str);
+            save_to_obj(str);
 
             if (m_right) {
-                m_right->to_obj(left_str, right_str + 1);
+                m_right->to_obj(str + "r");
             }
         }
 
@@ -193,24 +193,29 @@ protected:
             return std::pair(left_lumi * (1.0f / (left_d * left_d)), right_lumi * (1.0f / (right_d * right_d)));
         }
 
-        void save_to_obj(int left_str, int right_str) {
+        void save_to_obj(std::string str) {
             std::string dir_name = "lighttree_bboxes";
-            std::ostringstream oss;
-            oss << dir_name << "/l" << left_str << "_r" << right_str << ".obj";
 
             std::filesystem::path dir(dir_name);
             if (!std::filesystem::exists(dir)) {
                 std::filesystem::create_directory(dir);
             }
 
-            std::ofstream ofs(oss.str(), std::ofstream::out);
+            std::ofstream ofs(dir_name + "/" + str + ".obj", std::ofstream::out);
 
+            ofs << "# Vertices" << std::endl;
             for (size_t i = 0; i < 8; i++) { // Magic number here: TODO DEFINE: 8 = number of corners in bounding box
                 Point p = m_bbox.corner(i);
                 ofs << "v " << p.x() << " " << p.y() << " " << p.z() << std::endl;
             }
 
-            // TODO: See if faces declaration are necessary
+            ofs << std::endl << "# Faces" << std::endl;
+            ofs << "f 1 2 4 3" << std::endl;
+            ofs << "f 1 5 6 2" << std::endl;
+            ofs << "f 5 6 8 7" << std::endl;
+            ofs << "f 3 7 8 4" << std::endl;
+            ofs << "f 1 5 7 3" << std::endl;
+            ofs << "f 6 2 4 8" << std::endl;
 
             ofs.close();
         }
