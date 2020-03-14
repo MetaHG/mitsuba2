@@ -4,6 +4,7 @@
 #include <mitsuba/render/emitter.h>
 #include <mitsuba/render/fwd.h>
 #include <mitsuba/render/sensor.h>
+#include <mitsuba/render/lighttree.h>
 
 NAMESPACE_BEGIN(mitsuba)
 
@@ -94,7 +95,7 @@ public:
      */
     std::pair<DirectionSample3f, Spectrum>
     sample_emitter_direction(const Interaction3f &ref,
-                             const Point2f &sample,
+                             const Point3f &sample,
                              bool test_visibility = true,
                              Mask active = true) const;
 
@@ -200,6 +201,8 @@ protected:
     std::vector<ref<Object>> m_children;
     ref<Integrator> m_integrator;
     ref<Emitter> m_environment;
+
+    LightTree<Float, Spectrum, ScalarBoundingBox3f> *m_lighttree;
 };
 
 /// Dummy function which can be called to ensure that the librender shared library is loaded

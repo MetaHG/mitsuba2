@@ -70,10 +70,7 @@ public:
     /// Flags for all components combined.
     uint32_t flags(mask_t<Float> /*active*/ = true) const { return m_flags; }
 
-    float get_total_radiance() const {
-        //TODO: IMPLEMENT IN EMITTERS
-        return m_total_radiance;
-    }
+    virtual Spectrum get_total_radiance() const;
 
     float get_geometry_factor() const {
         //TODO: IMPLEMENT IN EMITTERS. WILL PROBABLY DEPEND ON SOME PARAMTERS
@@ -91,7 +88,6 @@ protected:
 protected:
     /// Combined flags for all properties of this emitter.
     uint32_t m_flags;
-    float m_total_radiance;
 };
 
 MTS_EXTERN_CLASS_RENDER(Emitter)

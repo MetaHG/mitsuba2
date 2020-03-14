@@ -98,10 +98,13 @@ MTS_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props) {
     for (Emitter *emitter: m_emitters)
         emitter->set_scene(this);
 
-    LightTree tree = LightTree<Float, Spectrum, ScalarBoundingBox3f>(m_emitters);
-    std::cerr << tree.to_string() << std::endl;
 
-    tree.to_obj();
+    // LIGHT TREE
+    m_lighttree = new LightTree<Float, Spectrum, ScalarBoundingBox3f>(m_emitters);
+    std::cerr << m_lighttree->to_string() << std::endl;
+
+    // DEBUG
+    // tree.to_obj();
 }
 
 MTS_VARIANT Scene<Float, Spectrum>::~Scene() {
@@ -145,13 +148,14 @@ Scene<Float, Spectrum>::ray_test(const Ray3f &ray, Mask active) const {
 }
 
 MTS_VARIANT std::pair<typename Scene<Float, Spectrum>::DirectionSample3f, Spectrum>
-Scene<Float, Spectrum>::sample_emitter_direction(const Interaction3f &ref, const Point2f &sample_,
+Scene<Float, Spectrum>::sample_emitter_direction(const Interaction3f &ref, const Point3f &sample_,
                                                  bool test_visibility, Mask active) const {
     MTS_MASKED_FUNCTION(ProfilerPhase::SampleEmitterDirection, active);
 
     using EmitterPtr = replace_scalar_t<Float, Emitter*>;
 
-    Point2f sample(sample_);
+    Point2f sample(sample_.x(), sample_.y());
+    Float tree_sample(sample_.z());
     DirectionSample3f ds;
     Spectrum spec;
 
@@ -160,22 +164,24 @@ Scene<Float, Spectrum>::sample_emitter_direction(const Interaction3f &ref, const
             // Fast path if there is only one emitter
             std::tie(ds, spec) = m_emitters[0]->sample_direction(ref, sample, active);
         } else {
-            ScalarFloat emitter_pdf = 1.f / m_emitters.size();
+//            ScalarFloat emitter_pdf = 1.f / m_emitters.size();
 
             // Randomly pick an emitter
-            UInt32 index = min(UInt32(sample.x() * (ScalarFloat) m_emitters.size()), (uint32_t) m_emitters.size()-1);
+//            UInt32 index = min(UInt32(sample.x() * (ScalarFloat) m_emitters.size()), (uint32_t) m_emitters.size()-1);
 
             // Rescale sample.x() to lie in [0,1) again
-            sample.x() = (sample.x() - index*emitter_pdf) * m_emitters.size();
+//            sample.x() = (sample.x() - index*emitter_pdf) * m_emitters.size();
 
-            EmitterPtr emitter = gather<EmitterPtr>(m_emitters.data(), index, active);
+//            EmitterPtr emitter = gather<EmitterPtr>(m_emitters.data(), index, active);
 
             // Sample a direction towards the emitter
-            std::tie(ds, spec) = emitter->sample_direction(ref, sample, active);
+            //std::tie(ds, spec) = emitter->sample_direction(ref, sample, active);
+
+            std::tie(ds, spec) = m_lighttree->sample_emitter(tree_sample, ref, sample, active);
 
             // Account for the discrete probability of sampling this emitter
-            ds.pdf *= emitter_pdf;
-            spec *= rcp(emitter_pdf);
+//            ds.pdf *= emitter_pdf;
+//            spec *= rcp(emitter_pdf);
         }
 
         active &= neq(ds.pdf, 0.f);

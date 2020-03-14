@@ -104,6 +104,19 @@ public:
 
     Spectrum eval(const SurfaceInteraction3f &, Mask) const override { return 0.f; }
 
+    Spectrum get_total_radiance() const override {
+        SurfaceInteraction3f si = zero<SurfaceInteraction3f>();
+
+        wavelength_t<Spectrum> wavelengths;
+        Spectrum wavelengths_weight;
+        std::tie(wavelengths, wavelengths_weight) = sample_wavelength<Float, Spectrum>(std::rand() / (double) RAND_MAX); // Should not use random, nor sample_wavelength
+
+        si.wavelengths = wavelengths;
+
+        std::cout << m_intensity->eval(si) << std::endl;
+        return m_intensity->eval(si);
+    }
+
     ScalarBoundingBox3f bbox() const override {
         return m_world_transform->translation_bounds();
     }

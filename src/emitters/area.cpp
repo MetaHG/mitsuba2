@@ -126,6 +126,20 @@ public:
 
     ScalarBoundingBox3f bbox() const override { return m_shape->bbox(); }
 
+    Spectrum get_total_radiance() const override {
+        //TODO: OVERRIDE TO IMPLEMENT CORRECT TOTAL RADIANCE
+        SurfaceInteraction3f si = zero<SurfaceInteraction3f>();
+
+        wavelength_t<Spectrum> wavelengths;
+        Spectrum wavelengths_weight;
+        std::tie(wavelengths, wavelengths_weight) = sample_wavelength<Float, Spectrum>(std::rand() / (double) RAND_MAX); // Should not use random, nor sample_wavelength
+
+        si.wavelengths = wavelengths;
+
+        std::cout << m_radiance->eval(si) << std::endl;
+        return m_radiance->eval(si);
+    }
+
     void traverse(TraversalCallback *callback) override {
         callback->put_object("radiance", m_radiance.get());
     }

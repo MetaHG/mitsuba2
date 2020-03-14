@@ -3,6 +3,8 @@
 #include <mitsuba/core/bbox.h>
 #include <mitsuba/core/spectrum.h>
 #include <mitsuba/core/vector.h>
+#include <mitsuba/core/properties.h>
+#include <mitsuba/core/plugin.h>
 
 #include <mitsuba/render/emitter.h>
 #include <mitsuba/render/sampler.h>
@@ -11,9 +13,9 @@
 
 #include <fstream>
 #include <filesystem>
+#include <queue>
 
 NAMESPACE_BEGIN(mitsuba)
-
 
 template <typename Float, typename Spectrum, typename BoundingBox>
 class LightTree: public Object {
@@ -21,10 +23,14 @@ public:
     MTS_IMPORT_TYPES(Emitter, Mesh, Sampler) // IndependentSampler apparently does not exist
 
     LightTree(host_vector<ref<Emitter>, Float> emitters) {
-        std::vector<LightNode*> leaves;
+        Properties sampler_props("independent");
+        sampler_props.set_int("sample_count", 4);
+        m_sampler = static_cast<Sampler *>(PluginManager::instance()->create_object<Sampler>(sampler_props));
 
+        std::vector<LightNode*> leaves;
         for (Emitter* emitter: emitters) {
             leaves.push_back(new LightNode(emitter));
+            std::cout << emitter->get_total_radiance() << std::endl;
         }
 
         m_tree = build_tree(leaves);
@@ -39,7 +45,7 @@ public:
             PriorityQLightElem(LightNode *n, float p_subtree) {
                 node = n;
                 float importance_ratio;
-                emitter = n->sample_emitter(importance_ratio, std::rand()); // Should use sampler instead of rand
+                emitter = n->sample_emitter(importance_ratio, std::rand() / (double)RAND_MAX); // Should use sampler instead of rand
                 std::tie(ds, illumination_estimate) = emitter->sample_direction(si, sample_, active);
                 illumination_estimate *= p_subtree / importance_ratio;
                 error_bound = n->get_intensity() * emitter->get_geometry_factor() * si->bsdf()->eval(ctx, si, ds, active); // Check if has to take opposite direction of ds
@@ -84,6 +90,18 @@ public:
         return NULL;
     }
 
+    std::pair<DirectionSample3f, Spectrum> sample_emitter(const Float &tree_sample, const Interaction3f &ref, const Point2f &emitter_sample, const Mask active) {
+        float pdf = 1.0f;
+        Emitter* emitter = m_tree->sample_emitter(ref, pdf, tree_sample);
+
+        DirectionSample3f ds;
+        Spectrum spec;
+        std::tie(ds, spec) = emitter->sample_direction(ref, emitter_sample, active);
+
+        ds.pdf *= pdf;
+        return std::pair(ds, spec / pdf);
+    }
+
     std::string to_string() const override {
         std::cout << "LighTree: Printing tree.." << std::endl;
         return m_tree->to_string();
@@ -106,11 +124,11 @@ protected:
         }
 
         /// Create light tree node
-        LightNode(LightNode* left, LightNode* right, float sample) {
+        LightNode(LightNode* left, LightNode* right, Float sample) {
             m_left = left;
             m_right = right;
             m_intensity = left->get_intensity() + right->get_intensity();
-            float left_representative_prob = left->get_intensity() / m_intensity;
+            float left_representative_prob = compute_luminance(left->get_intensity()) / compute_luminance(m_intensity);
             m_representative = left_representative_prob < sample ? left->get_representative() : right->get_representative();
             m_bbox = BoundingBox::merge(left->m_bbox, right->m_bbox);
         }
@@ -119,15 +137,21 @@ protected:
             //TODO
         }
 
-        Emitter* sample_emitter(float &importance_ratio, float sample) {
+        Emitter* sample_emitter(const Interaction3f &ref, float &importance_ratio, const Float &sample_) {
             importance_ratio = 1.0;
+            Float sample(sample_);
 
             LightNode* current = this;
-            while (!current->is_leaf()) {
-                float w_left = current->m_left->compute_weight();
-                float w_right = current->m_right->compute_weight();
 
-                float p_left = w_left / (w_left + w_right);
+            while (!current->is_leaf()) {
+                float w_left, w_right;
+                std::tie(w_left, w_right) = current->compute_weights(ref);
+
+                float p_left = 0.5f;
+                if (w_left + w_right >= std::numeric_limits<float>::epsilon()) {
+                    p_left = w_left / (w_left + w_right);
+                }
+
                 if (sample <= p_left) {
                     current = current->m_left;
                     sample = sample / p_left;
@@ -147,8 +171,12 @@ protected:
             return m_representative;
         }
 
-        float get_intensity() {
+        Spectrum get_intensity() {
             return m_intensity;
+        }
+
+        static float compute_luminance(Spectrum intensity) {
+            return hmean(intensity);
         }
 
         std::pair<LightNode*, LightNode*> get_children() {
@@ -157,7 +185,8 @@ protected:
 
         static float compute_cluster_metric(LightNode* n1, LightNode* n2) {
             BoundingBox bbox = BoundingBox::merge(n1->m_bbox, n2->m_bbox);
-            return (n1->get_intensity() + n2->get_intensity()) * squared_norm(bbox.extents());
+            Spectrum intensity = n1->get_intensity() + n2->get_intensity();
+            return hmean(intensity) * squared_norm(bbox.extents());
         }
 
         std::string to_string() const override {
@@ -195,11 +224,33 @@ protected:
 
     private:
         bool is_leaf() {
-            return m_right && m_left;
+            return !(m_right && m_left);
         }
 
-        float compute_weight() {
-            return m_intensity;
+        float compute_weight(const Interaction3f &ref) {
+            float distance = m_bbox.distance(ref.p);
+            float distance_factor = 1.0;
+            if (distance > 1 * norm(m_bbox.extents()))  { // 1.0 is a factor: TODO: DEFINE IT
+                distance_factor = 1.0f / (distance * distance);
+            }
+
+            return compute_luminance(m_intensity) * distance_factor;
+        }
+
+        std::pair<float, float> compute_weights(const Interaction3f &ref) {
+            float left_d = m_left->m_bbox.distance(ref.p);
+            float right_d = m_right->m_bbox.distance(ref.p);
+
+            float left_lumi = compute_luminance(m_left->m_intensity);
+            float right_lumi = compute_luminance(m_right->m_intensity);
+
+            float distance_ratio = 1.0f; //TODO: DEFINE IT
+            if (left_d <= distance_ratio * norm(m_left->m_bbox.extents())
+                || right_d <= distance_ratio * norm(m_right->m_bbox.extents())) {
+                return std::pair(left_lumi, right_lumi);
+            }
+
+            return std::pair(left_lumi * (1.0f / (left_d * left_d)), right_lumi * (1.0f / (right_d * right_d)));
         }
 
         void save_to_obj(int left_str, int right_str) {
@@ -226,7 +277,7 @@ protected:
 
 
     private:
-        float m_intensity;
+        Spectrum m_intensity;
         Emitter* m_representative; // Reprensentative light
         LightNode* m_left;
         LightNode* m_right;
@@ -258,7 +309,8 @@ protected:
                 }
             }
 
-            LightNode* newCluster = new LightNode(best_n1, best_n2, std::rand()); // Wanted to use independent sampler here, but didn't manage to import it...
+            Float sample = m_sampler->next_1d();
+            LightNode* newCluster = new LightNode(best_n1, best_n2, m_sampler->next_1d());
 
             leaves_set.erase(best_n1);
             leaves_set.erase(best_n2);
@@ -274,6 +326,7 @@ protected:
 
 protected:
     LightNode* m_tree;
+    ref<Sampler> m_sampler;
 };
 
 
