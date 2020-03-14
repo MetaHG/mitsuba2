@@ -40,56 +40,6 @@ public:
         //TODO
     }
 
-    std::vector<std::pair<DirectionSample3f, Spectrum>> sample_emitters_directions(const BSDFContext &ctx, const SurfaceInteraction3f &si, const Point2f &sample_, const Mask active) const {
-        struct PriorityQLightElem {
-            PriorityQLightElem(LightNode *n, float p_subtree) {
-                node = n;
-                float importance_ratio;
-                emitter = n->sample_emitter(importance_ratio, std::rand() / (double)RAND_MAX); // Should use sampler instead of rand
-                std::tie(ds, illumination_estimate) = emitter->sample_direction(si, sample_, active);
-                illumination_estimate *= p_subtree / importance_ratio;
-                error_bound = n->get_intensity() * emitter->get_geometry_factor() * si->bsdf()->eval(ctx, si, ds, active); // Check if has to take opposite direction of ds
-            }
-
-            LightNode* node;
-            Emitter* emitter;
-            DirectionSample3f ds;
-            Spectrum illumination_estimate;
-            Spectrum error_bound;
-        };
-
-        auto priority_q_light_elem_comp = [](const PriorityQLightElem& n1, const PriorityQLightElem& n2) { return n1.error_bound > n2.error_bound; };
-        std::priority_queue<PriorityQLightElem, 
-                            std::vector<PriorityQLightElem>,
-                            decltype(priority_q_light_elem_comp)> queue(priority_q_light_elem_comp);
-        
-        // Push initial node
-        PriorityQLightElem root_elem(m_tree, 1.0);
-        queue.push(root_elem);
-        Spectrum total_illumination_estimate = root_elem.illumination_estimate;
-
-        while (queue.top().error_bound > total_illumination_estimate * 0.02) { // Error ratio. TODO: To define somewhere to avoid magic numbers
-            auto parent = queue.pop();
-            total_illumination_estimate -= parent.illumnation_estimate;
-            
-            LightNode* left_child, right_child;
-            std::tie(left_child, right_child) = parent.node->get_children();
-            
-            PriorityQLightElem leftElem(parent.node->left_child, 0.0); // TODO: Need to compute the correct subtree probability 
-                                                                    // (Do an additional pass from top to bottom to compute subtree probabilities for all probabilities in the build tree function)
-            PriorityQLightElem rightElem(parent.node->right_child, 0.0); // TODO: Need to compute the correct subtree probability
-            
-            queue.push(leftElem);
-            queue.push(rightElem);
-            
-            total_illumination_estimate += leftElem.illumination_estimate;
-            total_illumination_estimate += rightElem.illumination_estimate;
-        }
-        
-        // Should return for each emitter the illumination estimate of the corresponding emitter, as well as the direction sampled of this emitter.
-        return NULL;
-    }
-
     std::pair<DirectionSample3f, Spectrum> sample_emitter(const Float &tree_sample, const Interaction3f &ref, const Point2f &emitter_sample, const Mask active) {
         float pdf = 1.0f;
         Emitter* emitter = m_tree->sample_emitter(ref, pdf, tree_sample);
@@ -227,16 +177,6 @@ protected:
             return !(m_right && m_left);
         }
 
-        float compute_weight(const Interaction3f &ref) {
-            float distance = m_bbox.distance(ref.p);
-            float distance_factor = 1.0;
-            if (distance > 1 * norm(m_bbox.extents()))  { // 1.0 is a factor: TODO: DEFINE IT
-                distance_factor = 1.0f / (distance * distance);
-            }
-
-            return compute_luminance(m_intensity) * distance_factor;
-        }
-
         std::pair<float, float> compute_weights(const Interaction3f &ref) {
             float left_d = m_left->m_bbox.distance(ref.p);
             float right_d = m_right->m_bbox.distance(ref.p);
@@ -309,7 +249,6 @@ protected:
                 }
             }
 
-            Float sample = m_sampler->next_1d();
             LightNode* newCluster = new LightNode(best_n1, best_n2, m_sampler->next_1d());
 
             leaves_set.erase(best_n1);
