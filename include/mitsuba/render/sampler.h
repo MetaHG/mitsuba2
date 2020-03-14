@@ -40,6 +40,9 @@ public:
     /// Retrieve the next two component values from the current sample
     virtual Point2f next_2d(Mask active = true);
 
+    /// Retrieve the next three component values from the current sample
+    virtual Point3f next_3d(Mask active = true);
+
     /// Return the number of samples per pixel
     size_t sample_count() const { return m_sample_count; }
 

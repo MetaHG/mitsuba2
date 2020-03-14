@@ -18,6 +18,10 @@ MTS_VARIANT typename Sampler<Float, Spectrum>::Point2f Sampler<Float, Spectrum>:
     NotImplementedError("next_2d");
 }
 
+MTS_VARIANT typename Sampler<Float, Spectrum>::Point3f Sampler<Float, Spectrum>::next_3d(Mask) {
+    NotImplementedError("next_3d");
+}
+
 MTS_IMPLEMENT_CLASS_VARIANT(Sampler, Object, "sampler")
 MTS_INSTANTIATE_CLASS(Sampler)
 NAMESPACE_END(mitsuba)

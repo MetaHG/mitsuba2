@@ -93,6 +93,13 @@ public:
         return Point2f(f1, f2);
     }
 
+    Point3f next_3d(Mask active = true) override {
+        Float f1 = next_1d(active),
+              f2 = next_1d(active),
+              f3 = next_1d(active);
+        return Point3f(f1, f2, f3);
+    }
+
     /// Return the size of the wavefront (or 0, if not seeded)
     size_t wavefront_size() const override {
         if (m_rng == nullptr)
