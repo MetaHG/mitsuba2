@@ -2,6 +2,7 @@
 
 #include <mitsuba/core/fwd.h>
 #include <mitsuba/core/transform.h>
+#include <mitsuba/core/bbox.h>
 #include <mitsuba/render/endpoint.h>
 #include <mitsuba/render/fwd.h>
 
@@ -61,10 +62,15 @@ template <typename Float, typename Spectrum>
 class MTS_EXPORT_RENDER Emitter : public Endpoint<Float, Spectrum> {
 public:
     MTS_IMPORT_BASE(Endpoint)
+    MTS_IMPORT_CORE_TYPES()
 
     /// Is this an environment map light emitter?
     bool is_environment() const {
         return has_flag(m_flags, EmitterFlags::Infinite) && !has_flag(m_flags, EmitterFlags::Delta);
+    }
+
+    ScalarBoundingBox3f bbox() const override {
+        return m_bbox;
     }
 
     /// Flags for all components combined.
@@ -88,6 +94,7 @@ protected:
 protected:
     /// Combined flags for all properties of this emitter.
     uint32_t m_flags;
+    ScalarBoundingBox3f m_bbox;
 };
 
 MTS_EXTERN_CLASS_RENDER(Emitter)

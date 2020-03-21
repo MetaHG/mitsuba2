@@ -5,6 +5,7 @@
 #include <mitsuba/render/fwd.h>
 #include <mitsuba/render/sensor.h>
 #include <mitsuba/render/lighttree.h>
+#include <mitsuba/render/bvh.h>
 
 NAMESPACE_BEGIN(mitsuba)
 
@@ -203,6 +204,7 @@ protected:
     ref<Emitter> m_environment;
 
     LightTree<Float, Spectrum, ScalarBoundingBox3f> *m_lighttree;
+    BVH<Float, Spectrum> *m_bvh;
 };
 
 /// Dummy function which can be called to ensure that the librender shared library is loaded

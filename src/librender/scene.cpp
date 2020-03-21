@@ -6,6 +6,7 @@
 #include <mitsuba/render/kdtree.h>
 #include <mitsuba/render/integrator.h>
 #include <mitsuba/render/lighttree.h>
+#include <mitsuba/render/bvh.h>
 #include <enoki/stl.h>
 
 #if defined(MTS_ENABLE_EMBREE)
@@ -98,10 +99,16 @@ MTS_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props) {
     for (Emitter *emitter: m_emitters)
         emitter->set_scene(this);
 
+    // BVH
+    m_bvh = new BVH<Float, Spectrum>(m_emitters, 1, SplitMethod::SAH);
+    m_bvh->to_obj();
+
 
     // LIGHT TREE
     m_lighttree = new LightTree<Float, Spectrum, ScalarBoundingBox3f>(m_emitters);
     std::cerr << m_lighttree->to_string() << std::endl;
+
+
 
     // DEBUG
     // m_lighttree->to_obj();

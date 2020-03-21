@@ -44,7 +44,7 @@ emitter shape and specify an :monosp:`area` instance as its child:
 template <typename Float, typename Spectrum>
 class AreaLight final : public Emitter<Float, Spectrum> {
 public:
-    MTS_IMPORT_BASE(Emitter, m_flags, m_shape, m_medium)
+    MTS_IMPORT_BASE(Emitter, m_flags, m_shape, m_medium, m_bbox)
     MTS_IMPORT_TYPES(Scene, Shape, Texture)
 
     AreaLight(const Properties &props) : Base(props) {
@@ -66,6 +66,7 @@ public:
 
         Base::set_shape(shape);
         m_area_times_pi = m_shape->surface_area() * math::Pi<ScalarFloat>;
+        m_bbox = m_shape->bbox();
     }
 
     Spectrum eval(const SurfaceInteraction3f &si, Mask active) const override {

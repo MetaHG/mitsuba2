@@ -40,6 +40,7 @@ add_library(mitsuba-render-obj OBJECT
   ${INC_DIR}/records.h
   ${INC_DIR}/volume_texture.h
   ${INC_DIR}/lighttree.h
+  ${INC_DIR}/bvh.h
 
   bsdf.cpp         ${INC_DIR}/bsdf.h
   emitter.cpp      ${INC_DIR}/emitter.h

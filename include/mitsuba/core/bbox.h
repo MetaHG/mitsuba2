@@ -251,6 +251,20 @@ template <typename Point_> struct BoundingBox {
         return enoki::sqrt(squared_distance(bbox));
     }
 
+
+    Vector offset(const Point &p) const {
+        Vector d = p - min;
+        Vector extents = this->extents();
+
+        for (uint32_t i = 0; i < Dimension; ++i) {
+            if (max[i] > min[i]) {
+                d[i] /= extents[i];
+            }
+        }
+
+        return d;
+    }
+
     /**
      * \brief Mark the bounding box as invalid.
      *
