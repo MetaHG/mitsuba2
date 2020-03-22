@@ -20,6 +20,7 @@ add_library(mitsuba-core-obj OBJECT
   ${INC_DIR}/simd.h
   ${INC_DIR}/platform.h
   ${INC_DIR}/variant.h
+  ${INC_DIR}/cone.h
 
   string.cpp           ${INC_DIR}/string.h
   appender.cpp         ${INC_DIR}/appender.h

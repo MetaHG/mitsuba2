@@ -100,7 +100,7 @@ MTS_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props) {
         emitter->set_scene(this);
 
     // BVH
-    m_bvh = new BVH<Float, Spectrum>(m_emitters, 1, SplitMethod::SAH);
+    m_bvh = new BVH<Float, Spectrum>(m_emitters, 1, SplitMethod::SAOH);
     m_bvh->to_obj();
 
 

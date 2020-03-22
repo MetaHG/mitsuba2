@@ -36,7 +36,7 @@ uniformly radiates illumination into all directions.
 template <typename Float, typename Spectrum>
 class PointLight final : public Emitter<Float, Spectrum> {
 public:
-    MTS_IMPORT_BASE(Emitter, m_flags, m_medium, m_needs_sample_3, m_world_transform, m_bbox)
+    MTS_IMPORT_BASE(Emitter, m_flags, m_medium, m_needs_sample_3, m_world_transform, m_bbox, m_cone)
     MTS_IMPORT_TYPES(Scene, Shape, Texture)
 
     PointLight(const Properties &props) : Base(props) {
@@ -54,6 +54,7 @@ public:
         m_flags = +EmitterFlags::DeltaPosition;
 
         m_bbox = ScalarBoundingBox3f(props.point3f("position"));
+        m_cone = ScalarCone3f(ScalarVector3f(1.0, 0, 0), M_PI, M_PI_2);
     }
 
     std::pair<Ray3f, Spectrum> sample_ray(Float time, Float wavelength_sample,

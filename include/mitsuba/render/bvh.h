@@ -27,7 +27,16 @@ public:
         // std::vector<BVHPrimInfo> prim_info(m_primitives.size());
         std::vector<BVHPrimInfo> prim_info;
         for (size_t i = 0; i < m_primitives.size(); i++) {
-            prim_info.push_back({ i, m_primitives[i]->bbox() });
+            switch (m_split_method) {
+            case SplitMethod::SAOH: {
+                prim_info.push_back({ i, m_primitives[i]->bbox(), m_primitives[i]->get_total_radiance(), m_primitives[i]->cone() });
+                break;
+            }
+            default: {
+                prim_info.push_back({ i, m_primitives[i]->bbox() });
+                break;
+            }
+            }
 //            prim_info[i] = {i, m_primitives[i]->bbox() };
         }
 
@@ -83,20 +92,24 @@ public:
 
 protected:
     struct BVHPrimInfo {
-        BVHPrimInfo(size_t prim_number, const ScalarBoundingBox3f &bbox):
-            prim_number(prim_number), bbox(bbox), centroid(bbox.center()) { }
+        BVHPrimInfo(size_t prim_number, const ScalarBoundingBox3f &bbox, Spectrum intensity = Spectrum(), ScalarCone3f cone = ScalarCone3f()):
+            prim_number(prim_number), bbox(bbox), centroid(bbox.center()), intensity(intensity), cone(cone) { }
 
         size_t prim_number;
         ScalarBoundingBox3f bbox;
         Point3f centroid;
+        Spectrum intensity;
+        ScalarCone3f cone;
     };
 
     struct BVHNode {
-        void init_leaf(int first, int n, const ScalarBoundingBox3f &box) {
+        void init_leaf(int first, int n, const ScalarBoundingBox3f &box, Spectrum e_intensity, ScalarCone3f cone) {
             first_prim_offset = first;
             prim_count = n;
             bbox = box;
             children[0] = children[1] = nullptr;
+            intensity = e_intensity;
+            bcone = cone;
         }
 
         void init_inner(int axis, BVHNode *c0, BVHNode *c1) {
@@ -105,6 +118,8 @@ protected:
             bbox = ScalarBoundingBox3f::merge(c0->bbox, c1->bbox);
             split_axis = axis;
             prim_count = 0;
+            intensity = c0->intensity + c1->intensity;
+            bcone = ScalarCone3f::merge(c0->bcone, c1->bcone);
         }
 
         ScalarBoundingBox3f bbox;
@@ -112,6 +127,9 @@ protected:
         int split_axis;
         int first_prim_offset;
         int prim_count;
+        // Emitter related fields
+        Spectrum intensity;
+        ScalarCone3f bcone;
     };
 
     struct LinearBVHNode {
@@ -136,20 +154,25 @@ protected:
 
         ScalarBoundingBox3f node_bbox;
         ScalarBoundingBox3f centroid_bbox;
+        Spectrum node_intensity;
+        ScalarCone3f node_cone;
+
         for (int i = start; i < end; i++) {
             node_bbox.expand(primitive_info[i].bbox);
-            centroid_bbox.expand(primitive_info[i].centroid); // TODO: Verify this works as box isn't initalized at the beginning
+            centroid_bbox.expand(primitive_info[i].centroid);
+            node_intensity += primitive_info[i].intensity;
+            node_cone = ScalarCone3f::merge(node_cone, primitive_info[i].cone);
         }
 
         int nb_prim = end - start;
         if (nb_prim == 1) {
-            node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox);
+            node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox, node_intensity, node_cone);
         } else {
             int dim = centroid_bbox.major_axis(); // TODO: Wrong type
 
             int mid = (start + end) / 2;
             if (centroid_bbox.max[dim] == centroid_bbox.min[dim]) { // TODO: Check if this equality is problematic
-                node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox);
+                node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox, node_intensity, node_cone);
             } else {
                 switch (m_split_method) {
                 case SplitMethod::Middle: {
@@ -171,6 +194,85 @@ protected:
                             [dim](const BVHPrimInfo &a, const BVHPrimInfo &b) {
                         return a.centroid[dim] < b.centroid[dim];
                     });
+                    break;
+                }
+
+                case SplitMethod::SAOH: {
+                    constexpr int nb_buckets = 12;
+
+                    struct BucketInfo {
+                        int count;
+                        ScalarBoundingBox3f bbox;
+                        Spectrum intensity;
+                        ScalarCone3f cone;
+                    };
+
+                    BucketInfo buckets[nb_buckets];
+
+                    for (int i = start; i < end; i++) {
+                        int b = nb_buckets * centroid_bbox.offset(primitive_info[i].centroid)[dim];
+                        if (b == nb_buckets) {
+                            b = nb_buckets - 1;
+                        }
+
+                        buckets[b].count++;
+                        buckets[b].bbox.expand(primitive_info[i].bbox);
+                        buckets[b].intensity += primitive_info[i].intensity;
+                        buckets[b].cone = ScalarCone3f::merge(buckets[b].cone, primitive_info[i].cone);
+                    }
+
+                    Float cost[nb_buckets - 1];
+                    for (int i = 0; i < nb_buckets - 1; i++) {
+                        ScalarBoundingBox3f b0, b1;
+                        int count0 = 0, count1 = 0;
+                        Spectrum i0, i1;
+                        ScalarCone3f c0, c1;
+
+                        for (int j = 0; j <= i; j++) {
+                            b0.expand(buckets[j].bbox);
+                            count0 += buckets[j].count;
+                            i0 += buckets[j].intensity;
+                            c0 = ScalarCone3f::merge(c0, buckets[j].cone);
+                        }
+
+                        for (int j = i+1; j < nb_buckets; j++) {
+                            b1.expand(buckets[j].bbox);
+                            count1 += buckets[j].count;
+                            i1 += buckets[j].intensity;
+                            c1 = ScalarCone3f::merge(c1, buckets[j].cone);
+                        }
+
+                        cost[i] = (compute_luminance(i0) * b0.surface_area() * c0.surface_area() // TODO: Need to add regularizer from paper?
+                                   + compute_luminance(i1) * b1.surface_area() * c1.surface_area())
+                                / (node_bbox.surface_area() * node_cone.surface_area());
+                    }
+
+                    Float min_cost = cost[0];
+                    int min_cost_split_bucket = 0;
+                    for (int i = 1; i < nb_buckets - 1; i++) {
+                        if (cost[i] < min_cost) {
+                            min_cost = cost[i];
+                            min_cost_split_bucket = i;
+                        }
+                    }
+
+                    Float leaf_cost = compute_luminance(node_intensity);
+                    if (min_cost < leaf_cost) {
+                        BVHPrimInfo *p_mid = std::partition(&primitive_info[start], &primitive_info[end-1] + 1,
+                                [=](const BVHPrimInfo &pi) {
+                            int b = nb_buckets * centroid_bbox.offset(pi.centroid)[dim];
+                            if (b == nb_buckets) {
+                                b = nb_buckets - 1;
+                            }
+
+                            return b <= min_cost_split_bucket;
+                        });
+
+                        mid = p_mid - &primitive_info[0];
+                    } else {
+                        node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox, node_intensity, node_cone);
+                    }
+
                     break;
                 }
 
@@ -285,7 +387,9 @@ private:
                          int start,
                          int end,
                          host_vector<ref<Emitter>, Float> &ordered_prims,
-                         ScalarBoundingBox3f &prims_bbox) {
+                         ScalarBoundingBox3f &prims_bbox,
+                         Spectrum intensity = Spectrum(), // TODO: CHECK HOW TO INITIALIZE FOR NO LIGHT
+                         ScalarCone3f cone = ScalarCone3f()) {
         BVHNode *leaf = new BVHNode();
 
         int nb_prim = end - start;
@@ -295,9 +399,13 @@ private:
             ordered_prims.push_back(m_primitives[prim_num]);
         }
 
-        leaf->init_leaf(first_prim_offset, nb_prim, prims_bbox);
+        leaf->init_leaf(first_prim_offset, nb_prim, prims_bbox, intensity, cone);
 
         return leaf;
+    }
+
+    static float compute_luminance(Spectrum intensity) {
+        return hmean(intensity);
     }
 
 private:

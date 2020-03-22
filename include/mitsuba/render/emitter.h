@@ -3,6 +3,7 @@
 #include <mitsuba/core/fwd.h>
 #include <mitsuba/core/transform.h>
 #include <mitsuba/core/bbox.h>
+#include <mitsuba/core/cone.h>
 #include <mitsuba/render/endpoint.h>
 #include <mitsuba/render/fwd.h>
 
@@ -73,6 +74,10 @@ public:
         return m_bbox;
     }
 
+    ScalarCone3f cone() const {
+        return m_cone;
+    }
+
     /// Flags for all components combined.
     uint32_t flags(mask_t<Float> /*active*/ = true) const { return m_flags; }
 
@@ -95,6 +100,7 @@ protected:
     /// Combined flags for all properties of this emitter.
     uint32_t m_flags;
     ScalarBoundingBox3f m_bbox;
+    ScalarCone3f m_cone;
 };
 
 MTS_EXTERN_CLASS_RENDER(Emitter)
