@@ -58,6 +58,18 @@ public:
         delete m_nodes;
     }
 
+    std::pair<DirectionSample3f, Spectrum> sample_emitter(const Float &tree_sample, const SurfaceInteraction3f &ref, const Point2f &emitter_sample, const Mask active) {
+        float pdf = 1.0f;
+        Emitter* emitter = sample_tree(ref, pdf, tree_sample);
+
+        DirectionSample3f ds;
+        Spectrum spec;
+        std::tie(ds, spec) = emitter->sample_direction(ref, emitter_sample, active);
+
+        ds.pdf *= pdf;
+        return std::pair(ds, spec / pdf);
+    }
+
     void to_obj() {
         std::string dir_name = "lighttree_bboxes";
 
@@ -133,6 +145,11 @@ protected:
     };
 
     struct LinearBVHNode {
+
+        bool is_leaf() {
+            return prim_count > 0;
+        }
+
         ScalarBoundingBox3f bbox;
         union {
             int primitives_offset; // leaf
@@ -140,10 +157,63 @@ protected:
         };
         uint16_t prim_count; // 0 -> inner node
         uint8_t axis;
-        uint8_t pad[1];
+        Spectrum intensity;
+        ScalarCone3f bcone;
+        uint8_t pad[1]; // Padding for memory/cache alignment => TO UPDATE IF NECESSARY
     };
 
 protected:
+    Emitter* sample_tree(const SurfaceInteraction3f &si, float &importance_ratio, const Float &sample_) {
+        importance_ratio = 1.0;
+        Float sample(sample_);
+
+        int offset = 0;
+        while (!m_nodes[offset].is_leaf()) {
+            float w_left, w_right;
+            std::tie(w_left, w_right) = compute_children_weights(offset, si);
+
+            float p_left = 0.5f;
+            if (w_left + w_right >= std::numeric_limits<float>::epsilon()) {
+                p_left = w_left / (w_left + w_right);
+            }
+
+            if (sample <= p_left) {
+                offset += 1;
+                sample = sample / p_left;
+                importance_ratio *= p_left;
+            } else {
+                offset = m_nodes[offset].second_child_offset;
+                float p_right = (1 - p_left);
+                sample = (sample - p_left) / p_right;
+                importance_ratio *= p_right;
+            }
+        }
+
+        return &m_nodes[offset];
+    }
+
+    std::pair<float, float> compute_children_weights(int offset, const SurfaceInteraction3f &ref) {
+        LinearBVHNode ln = m_nodes[offset + 1];
+        LinearBVHNode rn = m_nodes[m_nodes[offset].second_child_offset];
+
+        float l_weight = compute_cone_weight(&ln, ref);
+        float r_weight = compute_cone_weight(&rn, ref);
+
+        float left_d = ln.bbox.distance(ref.p);
+        float right_d = rn.bbox.distance(ref.p);
+
+        l_weight *= compute_luminance(ln.intensity);
+        r_weight *= compute_luminance(rn.intensity);
+
+        float distance_ratio = 1.0f; //TODO: DEFINE IT
+        if (left_d <= distance_ratio * norm(ln.bbox.extents())
+            || right_d <= distance_ratio * norm(rn.bbox.extents())) {
+            return std::pair(l_weight, r_weight);
+        }
+
+        return std::pair(l_weight * (1.0f / (left_d * left_d)), r_weight * (1.0f / (right_d * right_d)));
+    }
+
     BVHNode* recursive_build(std::vector<BVHPrimInfo> &primitive_info,
                              int start,
                              int end,
@@ -367,6 +437,8 @@ protected:
     int flatten_bvh_tree(BVHNode *node, int *offset) {
         LinearBVHNode *linear_node = &m_nodes[*offset];
         linear_node->bbox = node->bbox;
+        linear_node->bcone = node->bcone;
+        linear_node->intensity = node->intensity;
         int my_offset = (*offset)++;
 
         if (node->prim_count > 0) {
@@ -383,6 +455,28 @@ protected:
     }
 
 private:
+    float compute_cone_weight(LinearBVHNode *node, const SurfaceInteraction3f &si){
+        ScalarVector3f p_to_box_center = node->bbox.center() - si.p;
+
+        float in_angle = acos(dot(normalized(p_to_box_center), si.n));
+
+        float bangle = node->bbox.solid_angle(si.p);
+
+        float min_in_angle = max(in_angle - bangle, 0);
+
+        float caxis_p_angle = acos(dot(normalized(node->bcone.axis), normalized(-p_to_box_center)));
+
+        float min_e_angle = max(caxis_p_angle - node->bcone.normal_angle - bangle, 0);
+
+        float cone_weight = 0;
+
+        if (min_e_angle < node->bcone.emission_angle) {
+            cone_weight = abs(cos(min_in_angle)) * cos(min_e_angle);
+        }
+
+        return cone_weight;
+    }
+
     BVHNode* create_leaf(std::vector<BVHPrimInfo> &primitive_info,
                          int start,
                          int end,

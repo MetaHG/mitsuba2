@@ -265,6 +265,25 @@ template <typename Point_> struct BoundingBox {
         return d;
     }
 
+    //TODO: CHECK THIS
+    Scalar solid_angle(const Point &p) const {
+        Scalar max_angle = 0;
+
+        if (this->contains(p)) {
+            return 2 * M_PI;
+        }
+
+        for (size_t i = 0; i < 8; i++) {
+            Point corner = this->corner(i);
+            Vector p_center = this->center() - p;
+            Vector p_corner = corner - p;
+
+            max_angle = max(max_angle, acos(dot(normalized(p_center), normalized(p_corner))));
+        }
+
+        return max_angle;
+    }
+
     /**
      * \brief Mark the bounding box as invalid.
      *
