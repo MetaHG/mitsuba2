@@ -189,7 +189,18 @@ protected:
             }
         }
 
-        return &m_nodes[offset];
+        int leaf_offset = m_nodes[offset].primitives_offset;
+        int leaf_prim_count = m_nodes[offset].prim_count;
+
+        int prim_offset = leaf_prim_count * sample;
+        if (prim_offset == leaf_prim_count) {
+            prim_offset -= 1;
+        }
+
+        prim_offset += leaf_offset;
+        importance_ratio /= leaf_prim_count;
+
+        return m_primitives[prim_offset].get();
     }
 
     std::pair<float, float> compute_children_weights(int offset, const SurfaceInteraction3f &ref) {
