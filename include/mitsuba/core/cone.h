@@ -33,33 +33,38 @@ template <typename Float_, typename Point_> struct Cone {
     }
 
     static Cone merge(const Cone &c1, const Cone &c2) {
-        Cone c1_tmp = { c1.axis, c1.normal_angle, c1.emission_angle };
-        Cone c2_tmp = { c2.axis, c2.normal_angle, c2.emission_angle };
-
-        if (c2_tmp.normal_angle > c1_tmp.normal_angle) {
-            std::swap(c1_tmp, c2_tmp);
+        if (!c1.valid() || !c2.valid()) {
+            return Cone(max(c1.axis, c2.axis), max(c1.normal_angle, c2.normal_angle), max(c1.emission_angle, c2.emission_angle));
         }
 
-        Scalar diff_angle = acos(dot(c1_tmp.axis, c2_tmp.axis));
-        Scalar e_angle = max(c1_tmp.emission_angle, c2_tmp.emission_angle);
-
-        if (min(diff_angle + c2_tmp.emission_angle, M_PI)) {
-            return { c1_tmp.axis, c1_tmp.normal_angle, e_angle }; // Bounds of c1 already covers c2
+        if (c2.normal_angle > c1.normal_angle) {
+            return merge(c2, c1);
         }
 
-        Scalar n_angle = (c1_tmp.normal_angle + diff_angle + c2_tmp.normal_angle) / 2.0f;
+        Scalar diff_angle = acos(dot(c1.axis, c2.axis));
+        Scalar e_angle = max(c1.emission_angle, c2.emission_angle);
+
+        if (min(diff_angle + c2.emission_angle, M_PI)) {
+            return { c1.axis, c1.normal_angle, e_angle }; // Bounds of c1 already covers c2
+        }
+
+        Scalar n_angle = (c1.normal_angle + diff_angle + c2.normal_angle) / 2.0f;
         if (M_PIf32 <= n_angle) {
-            return { c1_tmp.normal_angle, M_PI, e_angle }; // Cone covers the sphere
+            return { c1.normal_angle, M_PI, e_angle }; // Cone covers the sphere
         }
 
-        Scalar n_diff_angle = n_angle - c1_tmp.normal_angle;
-        Vector rotation_axis = cross(c1_tmp.axis, c2_tmp.axis);
-        Vector new_axis = ScalarTransform4f::rotate(rotation_axis, n_diff_angle) * c1_tmp.axis; // TODO: Verify this works as expected
+        Scalar n_diff_angle = n_angle - c1.normal_angle;
+        Vector rotation_axis = cross(c1.axis, c2.axis);
+        Vector new_axis = ScalarTransform4f::rotate(rotation_axis, n_diff_angle) * c1.axis; // TODO: Verify this works as expected
         return { new_axis, n_angle, e_angle };
     }
 
+    bool valid() const {
+        return any(axis != Vector(0));
+    }
+
     void reset() {
-        axis = Vector();
+        axis = Vector(0);
         normal_angle = emission_angle = 0;
     }
 
