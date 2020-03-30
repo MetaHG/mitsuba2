@@ -116,7 +116,6 @@ public:
 
         si.wavelengths = wavelengths;
 
-        std::cout << m_intensity->eval(si) << std::endl;
         return m_intensity->eval(si);
     }
 

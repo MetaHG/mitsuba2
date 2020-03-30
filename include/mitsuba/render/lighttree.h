@@ -30,7 +30,7 @@ public:
         std::vector<LightNode*> leaves;
         for (Emitter* emitter: emitters) {
             leaves.push_back(new LightNode(emitter));
-            std::cout << emitter->get_total_radiance() << std::endl;
+//            std::cout << emitter->get_total_radiance() << std::endl;
         }
 
         m_tree = build_tree(leaves);
