@@ -210,11 +210,11 @@ protected:
         float l_weight = compute_cone_weight(&ln, ref);
         float r_weight = compute_cone_weight(&rn, ref);
 
-        float left_d = ln.bbox.distance(ref.p);
-        float right_d = rn.bbox.distance(ref.p);
-
         l_weight *= compute_luminance(ln.intensity);
         r_weight *= compute_luminance(rn.intensity);
+
+        float left_d = ln.bbox.distance(ref.p);
+        float right_d = rn.bbox.distance(ref.p);
 
         float distance_ratio = 1.0f; //TODO: DEFINE IT
         if (left_d <= distance_ratio * norm(ln.bbox.extents())
@@ -222,7 +222,7 @@ protected:
             return std::pair(l_weight, r_weight);
         }
 
-        return std::pair(l_weight * (1.0f / (left_d * left_d)), r_weight * (1.0f / (right_d * right_d)));
+        return std::pair(l_weight / (left_d * left_d), r_weight / (right_d * right_d));
     }
 
     BVHNode* recursive_build(std::vector<BVHPrimInfo> &primitive_info,
