@@ -370,6 +370,7 @@ protected:
                         mid = p_mid - &primitive_info[0];
                     } else {
                         node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox, node_intensity, node_cone);
+                        return node;
                     }
 
                     break;
