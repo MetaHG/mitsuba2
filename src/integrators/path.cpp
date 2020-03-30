@@ -155,7 +155,7 @@ public:
             Mask active_e = active && has_flag(bsdf->flags(), BSDFFlags::Smooth);
 
             if (likely(any_or<true>(active_e))) {
-                auto [ds, emitter_val] = scene->sample_emitter_direction(
+                auto [ds, emitter_val] = scene->sample_emitter_direction_custom(
                     si, sampler->next_3d(active_e), true, active_e);
                 active_e &= neq(ds.pdf, 0.f);
 
