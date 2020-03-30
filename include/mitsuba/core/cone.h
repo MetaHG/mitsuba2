@@ -68,4 +68,15 @@ template <typename Float_, typename Point_> struct Cone {
     Scalar emission_angle;
 };
 
+template <typename Float, typename Point>
+std::ostream &operator<<(std::ostream &os, const Cone<Float, Point> &cone) {
+    os << "Cone" << type_suffix<Point>();
+    os << "[" << std::endl
+       << "  axis = " << cone.axis << "," << std::endl
+       << "  normal_angle = " << cone.normal_angle << "," << std::endl
+       << "  emission_angle = " << cone.emission_angle << std::endl
+       << "]";
+    return os;
+}
+
 NAMESPACE_END(mitsuba)
