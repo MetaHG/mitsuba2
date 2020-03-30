@@ -173,23 +173,23 @@ Scene<Float, Spectrum>::sample_emitter_direction_custom(const SurfaceInteraction
         } else {
 //            ScalarFloat emitter_pdf = 1.f / m_emitters.size();
 
-            // Randomly pick an emitter
+//            // Randomly pick an emitter
 //            UInt32 index = min(UInt32(sample.x() * (ScalarFloat) m_emitters.size()), (uint32_t) m_emitters.size()-1);
 
-            // Rescale sample.x() to lie in [0,1) again
+//            // Rescale sample.x() to lie in [0,1) again
 //            sample.x() = (sample.x() - index*emitter_pdf) * m_emitters.size();
 
 //            EmitterPtr emitter = gather<EmitterPtr>(m_emitters.data(), index, active);
 
-            // Sample a direction towards the emitter
-            //std::tie(ds, spec) = emitter->sample_direction(ref, sample, active);
-            //SurfaceInteraction3f si = static_cast<SurfaceInteraction3f>(ref);
-            std::tie(ds, spec) = m_bvh->sample_emitter(tree_sample, ref, sample, active);
-            //std::tie(ds, spec) = m_lighttree->sample_emitter(tree_sample, ref, sample, active);
+//            // Sample a direction towards the emitter
+//            std::tie(ds, spec) = emitter->sample_direction(ref, sample, active);
 
-            // Account for the discrete probability of sampling this emitter
+//            // Account for the discrete probability of sampling this emitter
 //            ds.pdf *= emitter_pdf;
 //            spec *= rcp(emitter_pdf);
+
+            std::tie(ds, spec) = m_bvh->sample_emitter(tree_sample, ref, sample, active);
+            //std::tie(ds, spec) = m_lighttree->sample_emitter(tree_sample, ref, sample, active);
         }
 
         active &= neq(ds.pdf, 0.f);
