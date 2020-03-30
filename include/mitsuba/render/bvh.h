@@ -488,13 +488,13 @@ private:
     float compute_cone_weight(LinearBVHNode *node, const SurfaceInteraction3f &si){
         ScalarVector3f p_to_box_center = node->bbox.center() - si.p;
 
-        float in_angle = acos(dot(normalized(p_to_box_center), si.n));
+        float in_angle = acos(dot(normalize(p_to_box_center), si.n));
 
         float bangle = node->bbox.solid_angle(si.p);
 
         float min_in_angle = max(in_angle - bangle, 0);
 
-        float caxis_p_angle = acos(dot(normalized(node->bcone.axis), normalized(-p_to_box_center)));
+        float caxis_p_angle = acos(dot(normalize(node->bcone.axis), normalize(-p_to_box_center)));
 
         float min_e_angle = max(caxis_p_angle - node->bcone.normal_angle - bangle, 0);
 
