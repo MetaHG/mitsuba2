@@ -346,9 +346,12 @@ protected:
                             c1 = ScalarCone3f::merge(c1, buckets[j].cone);
                         }
 
-                        cost[i] = (compute_luminance(i0) * b0.surface_area() * c0.surface_area() // TODO: Need to add regularizer from paper?
-                                   + compute_luminance(i1) * b1.surface_area() * c1.surface_area())
-                                / (node_bbox.surface_area() * node_cone.surface_area());
+                        if (node_bbox.surface_area() < std::numeric_limits<float>::epsilon()) {
+                            cost[i] = (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
+                        } else {
+                            cost[i] = (compute_luminance(i0) * b0.surface_area() * c0.surface_area() // TODO: Need to add regularizer from paper?
+                                       + compute_luminance(i1) * b1.surface_area() * c1.surface_area())
+                                    / (node_bbox.surface_area() * node_cone.surface_area());
                     }
 
                     Float min_cost = cost[0];
