@@ -277,8 +277,7 @@ template <typename Point_> struct BoundingBox {
             Point corner = this->corner(i);
             Vector p_center = this->center() - p;
             Vector p_corner = corner - p;
-
-            max_angle = max(max_angle, acos(dot(normalized(p_center), normalized(p_corner))));
+            max_angle = enoki::max(max_angle, acos(dot(normalize(p_center), normalize(p_corner))));
         }
 
         return max_angle;
