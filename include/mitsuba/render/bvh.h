@@ -17,8 +17,8 @@ MTS_VARIANT class BVH : public Object {
 public:
     MTS_IMPORT_TYPES(Emitter)
 
-    BVH(const host_vector<ref<Emitter>, Float> &p, int max_prims_in_node, SplitMethod split_method):
-        m_max_prims_in_node(std::min(255, max_prims_in_node)), m_split_method(split_method), m_primitives(p) {
+    BVH(const host_vector<ref<Emitter>, Float> &p, int max_prims_in_node, SplitMethod split_method, bool visualize_volumes = false):
+        m_max_prims_in_node(std::min(255, max_prims_in_node)), m_split_method(split_method), m_primitives(p), m_visualize_volumes(visualize_volumes) {
 
         if (m_primitives.size() == 0) {
             return;
@@ -44,7 +44,7 @@ public:
         host_vector<ref<Emitter>, Float> ordered_prims;
         BVHNode *root;
 
-        root = recursive_build(prim_info, 0, m_primitives.size(), &total_nodes, ordered_prims);
+        root = recursive_build(prim_info, 0, m_primitives.size(), &total_nodes, ordered_prims, "_");
         m_primitives.swap(ordered_prims);
 
         m_nodes = new LinearBVHNode[total_nodes]; // TODO: Allocate memory differently?
@@ -159,7 +159,7 @@ protected:
         uint8_t axis;
         Spectrum intensity;
         ScalarCone3f bcone;
-        uint8_t pad[1]; // Padding for memory/cache alignment => TO UPDATE IF NECESSARY
+        uint8_t pad[1]; // Padding for memory/cache alignment
     };
 
 protected:
@@ -229,7 +229,8 @@ protected:
                              int start,
                              int end,
                              int *total_nodes,
-                             host_vector<ref<Emitter>, Float> &ordered_prims) {
+                             host_vector<ref<Emitter>, Float> &ordered_prims,
+                             std::string node_name = "") {
         BVHNode* node;
         (*total_nodes)++;
 
@@ -243,6 +244,10 @@ protected:
             centroid_bbox.expand(primitive_info[i].centroid);
             node_intensity += primitive_info[i].intensity;
             node_cone = ScalarCone3f::merge(node_cone, primitive_info[i].cone);
+        }
+
+        if (m_visualize_volumes) {
+            save_to_obj(node_name, node_bbox);
         }
 
         int nb_prim = end - start;
@@ -456,8 +461,8 @@ protected:
 
                 node = new BVHNode();
                 node->init_inner(dim,
-                                 recursive_build(primitive_info, start, mid, total_nodes, ordered_prims),
-                                 recursive_build(primitive_info, mid, end, total_nodes, ordered_prims));
+                                 recursive_build(primitive_info, start, mid, total_nodes, ordered_prims, node_name + "l"),
+                                 recursive_build(primitive_info, mid, end, total_nodes, ordered_prims, node_name + "r"));
             }
         }
 
@@ -532,12 +537,42 @@ private:
         return hmean(intensity);
     }
 
+    static void save_to_obj(std::string node_name, ScalarBoundingBox3f bbox) {
+        std::string dir_name = "lighttree_bboxes";
+
+        std::filesystem::path dir(dir_name);
+        if (!std::filesystem::exists(dir)) {
+            std::filesystem::create_directory(dir);
+        }
+
+        std::ostringstream oss;
+        oss << dir_name << "/" << node_name << ".obj";
+        std::ofstream ofs(oss.str(), std::ofstream::out);
+
+        ofs << "# Vertices" << std::endl;
+        for (size_t j = 0; j < 8; j++) { // Magic number here: TODO DEFINE: 8 = number of corners in bounding box
+            Point p = bbox.corner(j);
+            ofs << "v " << p.x() << " " << p.y() << " " << p.z() << std::endl;
+        }
+
+        ofs << std::endl << "# Faces" << std::endl;
+        ofs << "f 1 2 4 3" << std::endl;
+        ofs << "f 1 5 6 2" << std::endl;
+        ofs << "f 5 6 8 7" << std::endl;
+        ofs << "f 3 7 8 4" << std::endl;
+        ofs << "f 1 5 7 3" << std::endl;
+        ofs << "f 6 2 4 8" << std::endl;
+
+        ofs.close();
+    }
+
 private:
     const int m_max_prims_in_node;
     const SplitMethod m_split_method;
     host_vector<ref<Emitter>, Float> m_primitives;
     LinearBVHNode *m_nodes = nullptr;
     int m_total_nodes;
+    bool m_visualize_volumes;
 };
 
 NAMESPACE_END(mitsuba)
