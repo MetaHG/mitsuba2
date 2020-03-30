@@ -104,7 +104,7 @@ public:
 
 protected:
     struct BVHPrimInfo {
-        BVHPrimInfo(size_t prim_number, const ScalarBoundingBox3f &bbox, Spectrum intensity = Spectrum(), ScalarCone3f cone = ScalarCone3f()):
+        BVHPrimInfo(size_t prim_number, const ScalarBoundingBox3f &bbox, Spectrum intensity = 0.f, ScalarCone3f cone = ScalarCone3f()):
             prim_number(prim_number), bbox(bbox), centroid(bbox.center()), intensity(intensity), cone(cone) { }
 
         size_t prim_number;
@@ -233,10 +233,10 @@ protected:
         BVHNode* node;
         (*total_nodes)++;
 
-        ScalarBoundingBox3f node_bbox;
-        ScalarBoundingBox3f centroid_bbox;
-        Spectrum node_intensity;
-        ScalarCone3f node_cone;
+        ScalarBoundingBox3f node_bbox = ScalarBoundingBox3f();
+        ScalarBoundingBox3f centroid_bbox = ScalarBoundingBox3f();
+        Spectrum node_intensity = 0.f;
+        ScalarCone3f node_cone = ScalarCone3f();
 
         for (int i = start; i < end; i++) {
             node_bbox.expand(primitive_info[i].bbox);
@@ -282,6 +282,24 @@ protected:
                     constexpr int nb_buckets = 12;
 
                     struct BucketInfo {
+                        BucketInfo() {
+                            count = 0;
+                            bbox = ScalarBoundingBox3f();
+                            intensity = 0.f;
+                            cone = ScalarCone3f();
+                        }
+
+                        std::string to_string() const {
+                            std::ostringstream oss;
+                            oss << "BucketInfo[" << std::endl
+                                << "  count = " << count << "," << std::endl
+                                << "  bbox = " << bbox << "," << std::endl
+                                << "  intensity = " << intensity << "," << std::endl
+                                << "  cone = " << cone << std::endl
+                                << "]";
+                            return oss.str();
+                        }
+
                         int count;
                         ScalarBoundingBox3f bbox;
                         Spectrum intensity;
@@ -304,10 +322,10 @@ protected:
 
                     Float cost[nb_buckets - 1];
                     for (int i = 0; i < nb_buckets - 1; i++) {
-                        ScalarBoundingBox3f b0, b1;
+                        ScalarBoundingBox3f b0 = ScalarBoundingBox3f(), b1 = ScalarBoundingBox3f();
                         int count0 = 0, count1 = 0;
-                        Spectrum i0, i1;
-                        ScalarCone3f c0, c1;
+                        Spectrum i0 = 0.f, i1 = 0.f;
+                        ScalarCone3f c0 = ScalarCone3f(), c1 = ScalarCone3f();
 
                         for (int j = 0; j <= i; j++) {
                             b0.expand(buckets[j].bbox);
@@ -493,7 +511,7 @@ private:
                          int end,
                          host_vector<ref<Emitter>, Float> &ordered_prims,
                          ScalarBoundingBox3f &prims_bbox,
-                         Spectrum intensity = Spectrum(), // TODO: CHECK HOW TO INITIALIZE FOR NO LIGHT
+                         Spectrum intensity = 0.f,
                          ScalarCone3f cone = ScalarCone3f()) {
         BVHNode *leaf = new BVHNode();
 
