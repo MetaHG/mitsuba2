@@ -254,6 +254,24 @@ protected:
         if (nb_prim == 1) {
             node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox, node_intensity, node_cone);
         } else {
+            int split_dim = 0;
+            if (centroid_bbox.collapsed()) {
+                node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox, node_intensity, node_cone);
+            } else {
+                // Iterate over all dimensions
+                for (int i = 0; i < 3; i++) {
+                    int split_bucket = 0;
+                    int min_cost = 0;
+
+
+                }
+            }
+
+
+
+
+
+            // ---------------------------------------------------
             int dim = centroid_bbox.major_axis(); // TODO: Wrong type
 
             int mid = (start + end) / 2;
@@ -283,7 +301,19 @@ protected:
                     break;
                 }
 
-                case SplitMethod::SAOH: {
+                case SplitMethod::SAH:
+                case SplitMethod::SAOH:
+                default: {
+                    if (m_split_method != SplitMethod::SAOH && nb_prim <= 4) { //TODO: Define this threshold
+                        mid = (start + end) / 2;
+                        std::nth_element(&primitive_info[start], &primitive_info[mid], &primitive_info[end-1] + 1,
+                                [dim](const BVHPrimInfo &a, const BVHPrimInfo &b) {
+                            return a.centroid[dim] < b.centroid[dim];
+                        });
+
+                        break;
+                    }
+
                     constexpr int nb_buckets = 12;
 
                     struct BucketInfo {
@@ -321,8 +351,11 @@ protected:
 
                         buckets[b].count++;
                         buckets[b].bbox.expand(primitive_info[i].bbox);
-                        buckets[b].intensity += primitive_info[i].intensity;
-                        buckets[b].cone = ScalarCone3f::merge(buckets[b].cone, primitive_info[i].cone);
+
+                        if (m_split_method == SplitMethod::SAOH) {
+                            buckets[b].intensity += primitive_info[i].intensity;
+                            buckets[b].cone = ScalarCone3f::merge(buckets[b].cone, primitive_info[i].cone);
+                        }
                     }
 
 
@@ -336,28 +369,41 @@ protected:
                         for (int j = 0; j <= i; j++) {
                             b0.expand(buckets[j].bbox);
                             count0 += buckets[j].count;
-                            i0 += buckets[j].intensity;
-                            c0 = ScalarCone3f::merge(c0, buckets[j].cone);
+
+                            if (m_split_method == SplitMethod::SAOH) {
+                                i0 += buckets[j].intensity;
+                                c0 = ScalarCone3f::merge(c0, buckets[j].cone);
+                            }
                         }
 
                         for (int j = i+1; j < nb_buckets; j++) {
                             b1.expand(buckets[j].bbox);
                             count1 += buckets[j].count;
-                            i1 += buckets[j].intensity;
-                            c1 = ScalarCone3f::merge(c1, buckets[j].cone);
+
+                            if (m_split_method == SplitMethod::SAOH) {
+                                i1 += buckets[j].intensity;
+                                c1 = ScalarCone3f::merge(c1, buckets[j].cone);
+                            }
                         }
 
-                        if (node_bbox.surface_area() < std::numeric_limits<float>::epsilon()) {
-                            //cost[i] = squared_norm(node_bbox.extents()) * (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
-                            cost[i] = (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
+                        if (m_split_method == SplitMethod::SAOH) {
+                            if (node_bbox.surface_area() < std::numeric_limits<float>::epsilon()) {
+                                //cost[i] = squared_norm(node_bbox.extents()) * (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
+                                cost[i] = (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
+                            } else {
+                                cost[i] = (compute_luminance(i0) * b0.surface_area() * c0.surface_area() // TODO: Need to add regularizer from paper?
+                                           + compute_luminance(i1) * b1.surface_area() * c1.surface_area())
+                                        / (node_bbox.surface_area() * node_cone.surface_area());
+
+    //                            cost[i] = (compute_luminance(i0) * squared_norm(b0.extents()) * c0.surface_area()
+    //                                       + compute_luminance(i1) * squared_norm(b1.extents() * c1.surface_area()));
+                            }
                         } else {
-                            cost[i] = (compute_luminance(i0) * b0.surface_area() * c0.surface_area() // TODO: Need to add regularizer from paper?
-                                       + compute_luminance(i1) * b1.surface_area() * c1.surface_area())
-                                    / (node_bbox.surface_area() * node_cone.surface_area());
-
-//                            cost[i] = (compute_luminance(i0) * squared_norm(b0.extents()) * c0.surface_area()
-//                                       + compute_luminance(i1) * squared_norm(b1.extents() * c1.surface_area()));
+                            // m_split_method == SplitMethod::SAH
+                            cost[i] = 0.125f + (count0 * b0.surface_area() + // TODO: Define this cost
+                                                count1 * b1.surface_area()) / node_bbox.surface_area();
                         }
+
                     }
 
                     Float min_cost = cost[0];
@@ -369,8 +415,8 @@ protected:
                         }
                     }
 
-                    Float leaf_cost = compute_luminance(node_intensity);
-                    if (min_cost < leaf_cost) {
+                    Float leaf_cost = m_split_method == SplitMethod::SAOH ? compute_luminance(node_intensity) : nb_prim;
+                    if (min_cost < leaf_cost || (m_split_method != SplitMethod::SAOH && nb_prim > m_max_prims_in_node)) {
                         BVHPrimInfo *p_mid = std::partition(&primitive_info[start], &primitive_info[end-1] + 1,
                                 [=](const BVHPrimInfo &pi) {
                             int b = nb_buckets * centroid_bbox.offset(pi.centroid)[dim];
@@ -388,83 +434,7 @@ protected:
                     }
 
                     break;
-                }
 
-                case SplitMethod::SAH:
-                default: {
-                    if (nb_prim <= 4) { //TODO: Define this threshold
-                        mid = (start + end) / 2;
-                        std::nth_element(&primitive_info[start], &primitive_info[mid], &primitive_info[end-1] + 1,
-                                [dim](const BVHPrimInfo &a, const BVHPrimInfo &b) {
-                            return a.centroid[dim] < b.centroid[dim];
-                        });
-                    } else {
-                        constexpr int nb_buckets = 12; // TODO: define this value
-
-                        struct BucketInfo {
-                            int count = 0;
-                            ScalarBoundingBox3f bbox;
-                        };
-
-                        BucketInfo buckets[nb_buckets];
-
-                        for (int i = start; i < end; i++) {
-                            int b = nb_buckets * centroid_bbox.offset(primitive_info[i].centroid)[dim];
-                            if (b == nb_buckets) {
-                                b = nb_buckets - 1;
-                            }
-
-                            buckets[b].count++;
-                            buckets[b].bbox.expand(primitive_info[i].bbox);
-                        }
-
-                        Float cost[nb_buckets - 1];
-                        for (int i = 0; i < nb_buckets - 1; i++) {
-                            ScalarBoundingBox3f b0, b1;
-                            int count0 = 0, count1 = 0;
-
-                            for (int j = 0; j <= i; j++) {
-                                b0.expand(buckets[j].bbox);
-                                count0 += buckets[j].count;
-                            }
-
-                            for (int j = i+1; j < nb_buckets; j++) {
-                                b1.expand(buckets[j].bbox);
-                                count1 += buckets[j].count;
-                            }
-
-                            cost[i] = 0.125f + (count0 * b0.surface_area() + // TODO: Define this cost
-                                                count1 * b1.surface_area()) / node_bbox.surface_area();
-                        }
-
-                        Float min_cost = cost[0];
-                        int min_cost_split_bucket = 0;
-                        for (int i = 1; i < nb_buckets - 1; i++) {
-                            if (cost[i] < min_cost) {
-                                min_cost = cost[i];
-                                min_cost_split_bucket = i;
-                            }
-                        }
-
-                        Float leaf_cost = nb_prim;
-                        if (nb_prim > m_max_prims_in_node || min_cost < leaf_cost) {
-                            BVHPrimInfo *p_mid = std::partition(&primitive_info[start], &primitive_info[end-1] + 1,
-                                    [=](const BVHPrimInfo &pi) {
-                                int b = nb_buckets * centroid_bbox.offset(pi.centroid)[dim];
-                                if (b == nb_buckets) {
-                                    b = nb_buckets - 1;
-                                }
-
-                                return b <= min_cost_split_bucket;
-                            });
-
-                            mid = p_mid - &primitive_info[0];
-                        } else {
-                            node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox);
-                            return node;
-                        }
-                    }
-                    break;
                 }
                 }
 
