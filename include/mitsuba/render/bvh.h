@@ -247,7 +247,7 @@ protected:
         }
 
         if (m_visualize_volumes) {
-            save_to_obj(node_name, node_bbox);
+            save_to_obj(node_name, node_bbox, node_cone);
         }
 
         int nb_prim = end - start;
@@ -325,6 +325,7 @@ protected:
                         buckets[b].cone = ScalarCone3f::merge(buckets[b].cone, primitive_info[i].cone);
                     }
 
+
                     Float cost[nb_buckets - 1];
                     for (int i = 0; i < nb_buckets - 1; i++) {
                         ScalarBoundingBox3f b0 = ScalarBoundingBox3f(), b1 = ScalarBoundingBox3f();
@@ -347,11 +348,16 @@ protected:
                         }
 
                         if (node_bbox.surface_area() < std::numeric_limits<float>::epsilon()) {
+                            //cost[i] = squared_norm(node_bbox.extents()) * (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
                             cost[i] = (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
                         } else {
                             cost[i] = (compute_luminance(i0) * b0.surface_area() * c0.surface_area() // TODO: Need to add regularizer from paper?
                                        + compute_luminance(i1) * b1.surface_area() * c1.surface_area())
                                     / (node_bbox.surface_area() * node_cone.surface_area());
+
+//                            cost[i] = (compute_luminance(i0) * squared_norm(b0.extents()) * c0.surface_area()
+//                                       + compute_luminance(i1) * squared_norm(b1.extents() * c1.surface_area()));
+                        }
                     }
 
                     Float min_cost = cost[0];
@@ -540,7 +546,7 @@ private:
         return hmean(intensity);
     }
 
-    static void save_to_obj(std::string node_name, ScalarBoundingBox3f bbox) {
+    void save_to_obj(std::string node_name, ScalarBoundingBox3f bbox, ScalarCone3f cone) {
         std::string dir_name = "lighttree_bboxes";
 
         std::filesystem::path dir(dir_name);
@@ -567,6 +573,66 @@ private:
         ofs << "f 6 2 4 8" << std::endl;
 
         ofs.close();
+
+        std::ostringstream oss_cone;
+        oss_cone << dir_name << "/cone" << node_name << ".obj";
+        cone_to_obj(oss_cone.str(), bbox.center(), cone);
+    }
+
+    void cone_to_obj(std::string filename, ScalarPoint3f center, ScalarCone3f cone) {
+        std::ofstream ofs(filename, std::ofstream::out);
+
+        ofs << "# Vertices" << std::endl;
+        // Center
+        ofs << obj_vertex(center);
+
+        // Circle
+        ScalarVector3f a, b;
+        std::tie(a, b) = coordinate_system(cone.axis);
+        Point circle_center = center;
+        Float scale_factor = tan(cone.normal_angle);
+
+        float cone_scale_factor = 0.5f; // TODO: DEFINE
+        if (cone.normal_angle < M_PI_2f32 - std::numeric_limits<float>::epsilon()) {
+            float cos_scale_factor = cos(cone.normal_angle) * cone_scale_factor;
+            a *= scale_factor * cos_scale_factor;
+            circle_center += cone.axis * cos_scale_factor;
+        }
+
+        if (scale_factor < std::numeric_limits<float>::epsilon()) {
+            a = b * cone_scale_factor;
+        }
+
+        std::cout << "VECTOR A: " << a << ", Scale Factor: " << scale_factor << std::endl;
+
+        if (cone.normal_angle == 0) {
+            ofs << obj_vertex(circle_center);
+            ofs << "l 1 2" << std::endl;
+            return;
+        }
+
+        int nb_section = 12;
+        float section = 2 * M_PI / nb_section;
+        for (int i = 0; i < nb_section; i++) {
+            Point p = circle_center + ScalarTransform4f::rotate(cone.axis, rad_to_deg(i * section)) * a;
+            ofs << obj_vertex(p);
+        }
+
+        ofs << std::endl << "# Faces" << std::endl;
+
+        for (int i = 2; i < nb_section + 1; i++) {
+            ofs << "f 1 " << i << " " << i+1 << std::endl;
+        }
+
+        ofs << "f 1 " << nb_section + 1 << " 2" << std::endl;
+
+        ofs.close();
+    }
+
+    std::string obj_vertex(ScalarPoint3f p) {
+        std::ostringstream oss;
+        oss << "v " << p.x() << " " << p.y() << " " << p.z() << std::endl;
+        return oss.str();
     }
 
 private:

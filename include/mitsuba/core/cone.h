@@ -19,6 +19,7 @@ template <typename Float_, typename Point_> struct Cone {
     Cone(const Vector &v): axis(v), normal_angle(0), emission_angle(0) { }
     Cone(const Vector &v, const Scalar &n_angle, const Scalar &e_angle):
         axis(v), normal_angle(n_angle), emission_angle(e_angle) { }
+    Cone(const Cone &c): axis(c.axis), normal_angle(c.normal_angle), emission_angle(c.emission_angle) { }
 
     Scalar surface_area() {
         Scalar total_angle = min(normal_angle + emission_angle, M_PIf32);
@@ -34,33 +35,49 @@ template <typename Float_, typename Point_> struct Cone {
 
     static Cone merge(const Cone &c1, const Cone &c2) {
         if (!c1.valid() || !c2.valid()) {
-            return Cone(max(c1.axis, c2.axis), max(c1.normal_angle, c2.normal_angle), max(c1.emission_angle, c2.emission_angle));
+            if (!c1.valid()) {
+                return Cone(c2);
+            }
+
+            return Cone(c1);
         }
 
         if (c2.normal_angle > c1.normal_angle) {
             return merge(c2, c1);
         }
 
-        Scalar diff_angle = acos(dot(c1.axis, c2.axis));
+        Scalar diff_angle = enoki::unit_angle(c1.axis, c2.axis);
         Scalar e_angle = max(c1.emission_angle, c2.emission_angle);
 
-        if (min(diff_angle + c2.emission_angle, M_PI)) {
+        if (min(diff_angle + c2.normal_angle, math::Pi<Float>) <= c1.normal_angle + std::numeric_limits<float>::epsilon()) {
+            // std::cout << "Cone::Merge: Bounds of c1 already covers c2." << std::endl;
             return { c1.axis, c1.normal_angle, e_angle }; // Bounds of c1 already covers c2
         }
 
         Scalar n_angle = (c1.normal_angle + diff_angle + c2.normal_angle) / 2.0f;
+
         if (M_PIf32 <= n_angle) {
-            return { c1.normal_angle, M_PI, e_angle }; // Cone covers the sphere
+            // std::cout << "Cone::Merge: Cone covers the sphere." << std::endl;
+            return { c1.axis, M_PI, e_angle }; // Cone covers the sphere
         }
 
         Scalar n_diff_angle = n_angle - c1.normal_angle;
         Vector rotation_axis = cross(c1.axis, c2.axis);
-        Vector new_axis = ScalarTransform4f::rotate(rotation_axis, n_diff_angle) * c1.axis; // TODO: Verify this works as expected
+
+        Vector new_axis;
+        if (all(rotation_axis < std::numeric_limits<float>::epsilon())) {
+            // Cone vectors were anti-parallel. Pick a random vector in the disk perpendicular to the vectors as rotation axis
+            Vector a, b;
+            std::tie(a, b) = coordinate_system(c1.axis);
+            rotation_axis = a;
+        }
+
+        new_axis = ScalarTransform4f::rotate(rotation_axis, rad_to_deg(n_diff_angle)) * c1.axis;
         return { new_axis, n_angle, e_angle };
     }
 
     bool valid() const {
-        return any(axis != Vector(0));
+        return any(axis != 0);
     }
 
     void reset() {
