@@ -254,30 +254,12 @@ protected:
         if (nb_prim == 1) {
             node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox, node_intensity, node_cone);
         } else {
-            int split_dim = 0;
-            if (centroid_bbox.collapsed()) {
+            if (all(eq(centroid_bbox.min, centroid_bbox.max))) {
                 node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox, node_intensity, node_cone);
             } else {
-                // Iterate over all dimensions
-                for (int i = 0; i < 3; i++) {
-                    int split_bucket = 0;
-                    int min_cost = 0;
+                int mid = (start + end) / 2;
+                int dim = centroid_bbox.major_axis();
 
-
-                }
-            }
-
-
-
-
-
-            // ---------------------------------------------------
-            int dim = centroid_bbox.major_axis(); // TODO: Wrong type
-
-            int mid = (start + end) / 2;
-            if (centroid_bbox.max[dim] == centroid_bbox.min[dim]) { // TODO: Check if this equality is problematic
-                node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox, node_intensity, node_cone);
-            } else {
                 switch (m_split_method) {
                 case SplitMethod::Middle: {
                     Float p_mid = centroid_bbox.center()[dim];
@@ -315,107 +297,19 @@ protected:
                     }
 
                     constexpr int nb_buckets = 12;
+                    int min_cost_split_bucket;
+                    Float min_cost;
+                    find_split(primitive_info, start, end, centroid_bbox, node_bbox, node_cone,
+                                    nb_buckets, dim, min_cost_split_bucket, min_cost);
 
-                    struct BucketInfo {
-                        BucketInfo() {
-                            count = 0;
-                            bbox = ScalarBoundingBox3f();
-                            intensity = 0.f;
-                            cone = ScalarCone3f();
-                        }
-
-                        std::string to_string() const {
-                            std::ostringstream oss;
-                            oss << "BucketInfo[" << std::endl
-                                << "  count = " << count << "," << std::endl
-                                << "  bbox = " << bbox << "," << std::endl
-                                << "  intensity = " << intensity << "," << std::endl
-                                << "  cone = " << cone << std::endl
-                                << "]";
-                            return oss.str();
-                        }
-
-                        int count;
-                        ScalarBoundingBox3f bbox;
-                        Spectrum intensity;
-                        ScalarCone3f cone;
-                    };
-
-                    BucketInfo buckets[nb_buckets];
-
-                    for (int i = start; i < end; i++) {
-                        int b = nb_buckets * centroid_bbox.offset(primitive_info[i].centroid)[dim];
-                        if (b == nb_buckets) {
-                            b = nb_buckets - 1;
-                        }
-
-                        buckets[b].count++;
-                        buckets[b].bbox.expand(primitive_info[i].bbox);
-
-                        if (m_split_method == SplitMethod::SAOH) {
-                            buckets[b].intensity += primitive_info[i].intensity;
-                            buckets[b].cone = ScalarCone3f::merge(buckets[b].cone, primitive_info[i].cone);
-                        }
+                    Float leaf_cost;
+                    if (m_split_method == SplitMethod::SAOH) {
+                        leaf_cost = compute_luminance(node_intensity);
+                    } else {
+                        leaf_cost = nb_prim;
                     }
 
-
-                    Float cost[nb_buckets - 1];
-                    for (int i = 0; i < nb_buckets - 1; i++) {
-                        ScalarBoundingBox3f b0 = ScalarBoundingBox3f(), b1 = ScalarBoundingBox3f();
-                        int count0 = 0, count1 = 0;
-                        Spectrum i0 = 0.f, i1 = 0.f;
-                        ScalarCone3f c0 = ScalarCone3f(), c1 = ScalarCone3f();
-
-                        for (int j = 0; j <= i; j++) {
-                            b0.expand(buckets[j].bbox);
-                            count0 += buckets[j].count;
-
-                            if (m_split_method == SplitMethod::SAOH) {
-                                i0 += buckets[j].intensity;
-                                c0 = ScalarCone3f::merge(c0, buckets[j].cone);
-                            }
-                        }
-
-                        for (int j = i+1; j < nb_buckets; j++) {
-                            b1.expand(buckets[j].bbox);
-                            count1 += buckets[j].count;
-
-                            if (m_split_method == SplitMethod::SAOH) {
-                                i1 += buckets[j].intensity;
-                                c1 = ScalarCone3f::merge(c1, buckets[j].cone);
-                            }
-                        }
-
-                        if (m_split_method == SplitMethod::SAOH) {
-                            if (node_bbox.surface_area() < std::numeric_limits<float>::epsilon()) {
-                                //cost[i] = squared_norm(node_bbox.extents()) * (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
-                                cost[i] = (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
-                            } else {
-                                cost[i] = (compute_luminance(i0) * b0.surface_area() * c0.surface_area() // TODO: Need to add regularizer from paper?
-                                           + compute_luminance(i1) * b1.surface_area() * c1.surface_area())
-                                        / (node_bbox.surface_area() * node_cone.surface_area());
-
-    //                            cost[i] = (compute_luminance(i0) * squared_norm(b0.extents()) * c0.surface_area()
-    //                                       + compute_luminance(i1) * squared_norm(b1.extents() * c1.surface_area()));
-                            }
-                        } else {
-                            // m_split_method == SplitMethod::SAH
-                            cost[i] = 0.125f + (count0 * b0.surface_area() + // TODO: Define this cost
-                                                count1 * b1.surface_area()) / node_bbox.surface_area();
-                        }
-
-                    }
-
-                    Float min_cost = cost[0];
-                    int min_cost_split_bucket = 0;
-                    for (int i = 1; i < nb_buckets - 1; i++) {
-                        if (cost[i] < min_cost) {
-                            min_cost = cost[i];
-                            min_cost_split_bucket = i;
-                        }
-                    }
-
-                    Float leaf_cost = m_split_method == SplitMethod::SAOH ? compute_luminance(node_intensity) : nb_prim;
+                    std::cout << "Min cost: " << min_cost << ", Leaf cost: " << leaf_cost << std::endl;
                     if (min_cost < leaf_cost || (m_split_method != SplitMethod::SAOH && nb_prim > m_max_prims_in_node)) {
                         BVHPrimInfo *p_mid = std::partition(&primitive_info[start], &primitive_info[end-1] + 1,
                                 [=](const BVHPrimInfo &pi) {
@@ -434,7 +328,6 @@ protected:
                     }
 
                     break;
-
                 }
                 }
 
@@ -469,6 +362,115 @@ protected:
     }
 
 private:
+    void find_split(std::vector<BVHPrimInfo> &primitive_info, int start, int end,
+                    ScalarBoundingBox3f &centroid_bbox, ScalarBoundingBox3f &node_bbox, ScalarCone3f &node_cone,
+                    int nb_buckets, int &split_dim, int &split_bucket, Float &min_cost) {
+
+        split_dim = centroid_bbox.major_axis();
+        split_bucket = 0;
+        min_cost = std::numeric_limits<Float>::max();
+
+        for (int dim = 0; dim < 3; dim++) {
+            struct BucketInfo {
+                BucketInfo() {
+                    count = 0;
+                    bbox = ScalarBoundingBox3f();
+                    intensity = 0.f;
+                    cone = ScalarCone3f();
+                }
+
+                std::string to_string() const {
+                    std::ostringstream oss;
+                    oss << "BucketInfo[" << std::endl
+                        << "  count = " << count << "," << std::endl
+                        << "  bbox = " << bbox << "," << std::endl
+                        << "  intensity = " << intensity << "," << std::endl
+                        << "  cone = " << cone << std::endl
+                        << "]";
+                    return oss.str();
+                }
+
+                int count;
+                ScalarBoundingBox3f bbox;
+                Spectrum intensity;
+                ScalarCone3f cone;
+            };
+
+            BucketInfo buckets[nb_buckets];
+
+            for (int i = start; i < end; i++) {
+                int b = nb_buckets * centroid_bbox.offset(primitive_info[i].centroid)[dim];
+                if (b == nb_buckets) {
+                    b = nb_buckets - 1;
+                }
+
+                buckets[b].count++;
+                buckets[b].bbox.expand(primitive_info[i].bbox);
+
+                if (m_split_method == SplitMethod::SAOH) {
+                    buckets[b].intensity += primitive_info[i].intensity;
+                    buckets[b].cone = ScalarCone3f::merge(buckets[b].cone, primitive_info[i].cone);
+                }
+            }
+
+
+            Float cost[nb_buckets - 1];
+            for (int i = 0; i < nb_buckets - 1; i++) {
+                ScalarBoundingBox3f b0 = ScalarBoundingBox3f(), b1 = ScalarBoundingBox3f();
+                int count0 = 0, count1 = 0;
+                Spectrum i0 = 0.f, i1 = 0.f;
+                ScalarCone3f c0 = ScalarCone3f(), c1 = ScalarCone3f();
+
+                for (int j = 0; j <= i; j++) {
+                    b0.expand(buckets[j].bbox);
+                    count0 += buckets[j].count;
+
+                    if (m_split_method == SplitMethod::SAOH) {
+                        i0 += buckets[j].intensity;
+                        c0 = ScalarCone3f::merge(c0, buckets[j].cone);
+                    }
+                }
+
+                for (int j = i+1; j < nb_buckets; j++) {
+                    b1.expand(buckets[j].bbox);
+                    count1 += buckets[j].count;
+
+                    if (m_split_method == SplitMethod::SAOH) {
+                        i1 += buckets[j].intensity;
+                        c1 = ScalarCone3f::merge(c1, buckets[j].cone);
+                    }
+                }
+
+                if (m_split_method == SplitMethod::SAOH) {
+                    if (node_bbox.surface_area() < std::numeric_limits<float>::epsilon()) {
+                        //cost[i] = squared_norm(node_bbox.extents()) * (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
+                        cost[i] = (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
+                    } else {
+                        cost[i] = (compute_luminance(i0) * b0.surface_area() * c0.surface_area() // TODO: Need to add regularizer from paper?
+                                   + compute_luminance(i1) * b1.surface_area() * c1.surface_area())
+                                / (node_bbox.surface_area() * node_cone.surface_area());
+
+//                            cost[i] = (compute_luminance(i0) * squared_norm(b0.extents()) * c0.surface_area()
+//                                       + compute_luminance(i1) * squared_norm(b1.extents() * c1.surface_area()));
+                    }
+                } else {
+                    // m_split_method == SplitMethod::SAH
+                    cost[i] = 0.125f + (count0 * b0.surface_area() + // TODO: Define this cost
+                                        count1 * b1.surface_area()) / node_bbox.surface_area();
+                }
+
+            }
+
+            for (int i = 1; i < nb_buckets - 1; i++) {
+                if (cost[i] < min_cost) {
+                    min_cost = cost[i];
+                    split_bucket = i;
+                    split_dim = dim;
+                }
+            }
+        }
+    }
+
     float compute_cone_weight(LinearBVHNode *node, const SurfaceInteraction3f &si){
         ScalarVector3f p_to_box_center = node->bbox.center() - si.p;
 
@@ -572,8 +574,6 @@ private:
         if (scale_factor < std::numeric_limits<float>::epsilon()) {
             a = b * cone_scale_factor;
         }
-
-        std::cout << "VECTOR A: " << a << ", Scale Factor: " << scale_factor << std::endl;
 
         if (cone.normal_angle == 0) {
             ofs << obj_vertex(circle_center);

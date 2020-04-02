@@ -138,7 +138,6 @@ public:
 
         si.wavelengths = wavelengths;
 
-        std::cout << m_radiance->eval(si) << std::endl;
         return m_radiance->eval(si) * m_shape->surface_area();
     }
 
