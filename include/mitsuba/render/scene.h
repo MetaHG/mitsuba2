@@ -124,6 +124,10 @@ public:
                                 const DirectionSample3f &ds,
                                 Mask active = true) const;
 
+    Float pdf_emitter_direction_custom(const SurfaceInteraction3f &ref,
+                                const DirectionSample3f &ds,
+                                Mask active = true) const;
+
     //! @}
     // =============================================================
 

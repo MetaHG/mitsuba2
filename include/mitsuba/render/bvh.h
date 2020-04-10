@@ -70,6 +70,10 @@ public:
         return std::pair(ds, spec / pdf);
     }
 
+    Float pdf_emitter(const SurfaceInteraction3f &ref, const Emitter* emitter) {
+        return pdf_tree(ref, emitter);
+    }
+
     void to_obj() {
         std::string dir_name = "lighttree_bboxes";
 
@@ -201,6 +205,37 @@ protected:
         importance_ratio /= leaf_prim_count;
 
         return m_primitives[prim_offset].get();
+    }
+
+    Float pdf_tree(const SurfaceInteraction3f &si, const Emitter* emitter) {
+        Float pdf = 1.0;
+
+        int offset = 0;
+
+        while (!m_nodes[offset].is_leaf()) {
+            float w_left, w_right;
+            std::tie(w_left, w_right) = compute_children_weights(offset, si);
+
+            LinearBVHNode ln = m_nodes[offset + 1];
+            LinearBVHNode rn = m_nodes[m_nodes[offset].second_child_offset];
+
+            float p_left = 0.5f;
+            if (w_left + w_right >= std::numeric_limits<float>::epsilon()) {
+                p_left = w_left / (w_left + w_right);
+            }
+
+            if (ln.bbox.contains(emitter->bbox())) {
+                pdf *= p_left;
+                offset += 1;
+            } else {
+                pdf *= (1 - p_left);
+                offset = m_nodes[offset].second_child_offset;
+            }
+        }
+
+        pdf /= m_nodes[offset].prim_count;
+
+        return pdf;
     }
 
     std::pair<float, float> compute_children_weights(int offset, const SurfaceInteraction3f &ref) {

@@ -198,7 +198,7 @@ public:
             if (any_or<true>(neq(emitter, nullptr))) {
                 Float emitter_pdf =
                     select(neq(emitter, nullptr) && !has_flag(bs.sampled_type, BSDFFlags::Delta),
-                           scene->pdf_emitter_direction(si, ds),
+                           scene->pdf_emitter_direction_custom(si, ds),
                            0.f);
 
                 emission_weight = mis_weight(bs.pdf, emitter_pdf);

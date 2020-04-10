@@ -208,6 +208,23 @@ Scene<Float, Spectrum>::sample_emitter_direction_custom(const SurfaceInteraction
     return { ds, spec };
 }
 
+MTS_VARIANT Float
+Scene<Float, Spectrum>::pdf_emitter_direction_custom(const SurfaceInteraction3f &ref,
+                                              const DirectionSample3f &ds,
+                                              Mask active) const {
+    MTS_MASK_ARGUMENT(active);
+    using EmitterPtr = replace_scalar_t<Float, const Emitter *>;
+
+
+    if (m_emitters.size() == 1) {
+        // Fast path if there is only one emitter
+        return m_emitters[0]->pdf_direction(ref, ds, active);
+    } else {
+        return reinterpret_array<EmitterPtr>(ds.object)->pdf_direction(ref, ds, active) *
+            m_bvh->pdf_emitter(ref, reinterpret_array<EmitterPtr>(ds.object));
+    }
+}
+
 MTS_VARIANT std::pair<typename Scene<Float, Spectrum>::DirectionSample3f, Spectrum>
 Scene<Float, Spectrum>::sample_emitter_direction(const Interaction3f &ref, const Point3f &sample_,
                                                  bool test_visibility, Mask active) const {
