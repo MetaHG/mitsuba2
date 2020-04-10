@@ -179,7 +179,7 @@ protected:
 
             if (sample <= p_left) {
                 offset += 1;
-                sample = sample / p_left;
+                sample = p_left == 0 ? 0 : sample / p_left;
                 importance_ratio *= p_left;
             } else {
                 offset = m_nodes[offset].second_child_offset;
