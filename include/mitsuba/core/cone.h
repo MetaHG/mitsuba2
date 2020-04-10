@@ -71,6 +71,7 @@ template <typename Float_, typename Point_> struct Cone {
             std::tie(a, b) = coordinate_system(c1.axis);
             rotation_axis = a;
         }
+        rotation_axis = normalize(cross(c1.axis, c2.axis));
 
         new_axis = ScalarTransform4f::rotate(rotation_axis, rad_to_deg(n_diff_angle)) * c1.axis;
         return { new_axis, n_angle, e_angle };
