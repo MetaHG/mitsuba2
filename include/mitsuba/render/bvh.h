@@ -344,7 +344,6 @@ protected:
                         leaf_cost = nb_prim;
                     }
 
-                    std::cout << "Min cost: " << min_cost << ", Leaf cost: " << leaf_cost << std::endl;
                     if (min_cost < leaf_cost || (m_split_method != SplitMethod::SAOH && nb_prim > m_max_prims_in_node)) {
                         BVHPrimInfo *p_mid = std::partition(&primitive_info[start], &primitive_info[end-1] + 1,
                                 [=](const BVHPrimInfo &pi) {
