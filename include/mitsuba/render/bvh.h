@@ -400,36 +400,36 @@ private:
                     ScalarBoundingBox3f &centroid_bbox, ScalarBoundingBox3f &node_bbox, ScalarCone3f &node_cone,
                     int nb_buckets, int &split_dim, int &split_bucket, Float &min_cost) {
 
+        struct BucketInfo {
+            BucketInfo() {
+                count = 0;
+                bbox = ScalarBoundingBox3f();
+                intensity = 0.f;
+                cone = ScalarCone3f();
+            }
+
+            std::string to_string() const {
+                std::ostringstream oss;
+                oss << "BucketInfo[" << std::endl
+                    << "  count = " << count << "," << std::endl
+                    << "  bbox = " << bbox << "," << std::endl
+                    << "  intensity = " << intensity << "," << std::endl
+                    << "  cone = " << cone << std::endl
+                    << "]";
+                return oss.str();
+            }
+
+            int count;
+            ScalarBoundingBox3f bbox;
+            Spectrum intensity;
+            ScalarCone3f cone;
+        };
+
         split_dim = centroid_bbox.major_axis();
         split_bucket = 0;
         min_cost = std::numeric_limits<Float>::max();
 
         for (int dim = 0; dim < 3; dim++) {
-            struct BucketInfo {
-                BucketInfo() {
-                    count = 0;
-                    bbox = ScalarBoundingBox3f();
-                    intensity = 0.f;
-                    cone = ScalarCone3f();
-                }
-
-                std::string to_string() const {
-                    std::ostringstream oss;
-                    oss << "BucketInfo[" << std::endl
-                        << "  count = " << count << "," << std::endl
-                        << "  bbox = " << bbox << "," << std::endl
-                        << "  intensity = " << intensity << "," << std::endl
-                        << "  cone = " << cone << std::endl
-                        << "]";
-                    return oss.str();
-                }
-
-                int count;
-                ScalarBoundingBox3f bbox;
-                Spectrum intensity;
-                ScalarCone3f cone;
-            };
-
             BucketInfo buckets[nb_buckets];
 
             for (int i = start; i < end; i++) {
