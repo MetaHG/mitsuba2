@@ -344,7 +344,7 @@ protected:
                         leaf_cost = nb_prim;
                     }
 
-                    if (min_cost < leaf_cost || (m_split_method != SplitMethod::SAOH && nb_prim > m_max_prims_in_node)) {
+                    if (min_cost + std::numeric_limits<Float>::epsilon() < leaf_cost || (m_split_method != SplitMethod::SAOH && nb_prim > m_max_prims_in_node)) {
                         BVHPrimInfo *p_mid = std::partition(&primitive_info[start], &primitive_info[end-1] + 1,
                                 [=](const BVHPrimInfo &pi) {
                             int b = nb_buckets * centroid_bbox.offset(pi.centroid)[dim];
