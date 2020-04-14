@@ -495,7 +495,7 @@ private:
 
             }
 
-            for (int i = 1; i < nb_buckets - 1; i++) {
+            for (int i = 0; i < nb_buckets - 1; i++) {
                 if (cost[i] < min_cost) {
                     min_cost = cost[i];
                     split_bucket = i;
