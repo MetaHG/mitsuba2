@@ -239,11 +239,11 @@ protected:
     }
 
     std::pair<float, float> compute_children_weights(int offset, const SurfaceInteraction3f &ref) {
-        LinearBVHNode ln = m_nodes[offset + 1];
-        LinearBVHNode rn = m_nodes[m_nodes[offset].second_child_offset];
+        const LinearBVHNode ln = m_nodes[offset + 1];
+        const LinearBVHNode rn = m_nodes[m_nodes[offset].second_child_offset];
 
-        float l_weight = compute_cone_weight(&ln, ref);
-        float r_weight = compute_cone_weight(&rn, ref);
+        float l_weight = compute_cone_weight(ln, ref);
+        float r_weight = compute_cone_weight(rn, ref);
 
         l_weight *= compute_luminance(ln.intensity);
         r_weight *= compute_luminance(rn.intensity);
@@ -505,22 +505,22 @@ private:
         }
     }
 
-    float compute_cone_weight(LinearBVHNode *node, const SurfaceInteraction3f &si){
-        ScalarVector3f p_to_box_center = node->bbox.center() - si.p;
+    float compute_cone_weight(const LinearBVHNode &node, const SurfaceInteraction3f &si){
+        ScalarVector3f p_to_box_center = node.bbox.center() - si.p;
 
         float in_angle = acos(dot(normalize(p_to_box_center), si.n));
 
-        float bangle = node->bbox.solid_angle(si.p);
+        float bangle = node.bbox.solid_angle(si.p);
 
         float min_in_angle = max(in_angle - bangle, 0);
 
-        float caxis_p_angle = acos(dot(normalize(node->bcone.axis), normalize(-p_to_box_center)));
+        float caxis_p_angle = acos(dot(normalize(node.bcone.axis), normalize(-p_to_box_center)));
 
-        float min_e_angle = max(caxis_p_angle - node->bcone.normal_angle - bangle, 0);
+        float min_e_angle = max(caxis_p_angle - node.bcone.normal_angle - bangle, 0);
 
         float cone_weight = 0;
 
-        if (min_e_angle < node->bcone.emission_angle) {
+        if (min_e_angle < node.bcone.emission_angle) {
             cone_weight = abs(cos(min_in_angle)) * cos(min_e_angle);
         }
 
@@ -548,7 +548,7 @@ private:
         return leaf;
     }
 
-    static float compute_luminance(Spectrum intensity) {
+    static inline float compute_luminance(Spectrum intensity) {
         return hmean(intensity);
     }
 
