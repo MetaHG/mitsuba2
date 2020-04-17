@@ -17,8 +17,13 @@ MTS_VARIANT class BVH : public Object {
 public:
     MTS_IMPORT_TYPES(Emitter)
 
-    BVH(const host_vector<ref<Emitter>, Float> &p, int max_prims_in_node, SplitMethod split_method, bool visualize_volumes = false):
-        m_max_prims_in_node(std::min(255, max_prims_in_node)), m_split_method(split_method), m_primitives(p), m_visualize_volumes(visualize_volumes) {
+    BVH(host_vector<ref<Emitter>, Float> p, int max_prims_in_node, SplitMethod split_method, bool visualize_volumes = false):
+        m_max_prims_in_node(std::min(255, max_prims_in_node)), m_split_method(split_method), m_visualize_volumes(visualize_volumes) {
+
+        m_primitives = std::vector<BVHPrimitive*>(p.size());
+        for (size_t i = 0; i < p.size(); i++) {
+            m_primitives[i] = new BVHPrimitive(p[i]);
+        }
 
         if (m_primitives.size() == 0) {
             return;
@@ -41,7 +46,7 @@ public:
         }
 
         int total_nodes = 0;
-        host_vector<ref<Emitter>, Float> ordered_prims;
+        std::vector<BVHPrimitive*> ordered_prims;
         BVHNode *root;
 
         root = recursive_build(prim_info, 0, m_primitives.size(), &total_nodes, ordered_prims, "_");
@@ -51,7 +56,7 @@ public:
         m_total_nodes = total_nodes;
 
         int offset = 0;
-        flatten_bvh_tree(root, &offset);
+        flatten_bvh_tree(root, &offset, -1);
     }
 
     ~BVH() {
@@ -149,6 +154,9 @@ protected:
     };
 
     struct LinearBVHNode {
+        bool is_root() {
+            return parent_offset < 0;
+        }
 
         bool is_leaf() {
             return prim_count > 0;
@@ -163,7 +171,30 @@ protected:
         uint8_t axis;
         Spectrum intensity;
         ScalarCone3f bcone;
+        int parent_offset;
         uint8_t pad[1]; // Padding for memory/cache alignment
+    };
+
+    struct BVHPrimitive {
+        BVHPrimitive(Emitter *emitter) : emitter(emitter), leaf_offset(-1) {}
+        Emitter *emitter;
+        int leaf_offset;
+
+        inline ScalarBoundingBox3f bbox() {
+            return emitter->bbox();
+        }
+
+        inline ScalarCone3f cone() {
+            return emitter->cone();
+        }
+
+        inline Spectrum get_total_radiance() {
+            return emitter->get_total_radiance();
+        }
+
+        inline bool operator==(const BVHPrimitive &prim){
+            return emitter == prim.emitter;
+        }
     };
 
 protected:
@@ -204,36 +235,49 @@ protected:
         prim_offset += leaf_offset;
         importance_ratio /= leaf_prim_count;
 
-        return m_primitives[prim_offset].get();
+        return m_primitives[prim_offset]->emitter;
     }
 
-    Float pdf_tree(const SurfaceInteraction3f &si, const Emitter* emitter) {
+    Float pdf_tree(const SurfaceInteraction3f &si, const Emitter *emitter) {
         Float pdf = 1.0;
 
-        int offset = 0;
+        typename std::vector<BVHPrimitive*>::iterator it = std::find_if(m_primitives.begin(), m_primitives.end(),
+                                                                        [emitter](BVHPrimitive* p) {return p->emitter == emitter; });
+        BVHPrimitive* prim = *it;
 
-        while (!m_nodes[offset].is_leaf()) {
-            float w_left, w_right;
-            std::tie(w_left, w_right) = compute_children_weights(offset, si);
+        int prev_offset;
+        int current_offset = prim->leaf_offset;
+        LinearBVHNode *current_node;
 
-            LinearBVHNode ln = m_nodes[offset + 1];
-            LinearBVHNode rn = m_nodes[m_nodes[offset].second_child_offset];
 
-            float p_left = 0.5f;
-            if (w_left + w_right >= std::numeric_limits<float>::epsilon()) {
-                p_left = w_left / (w_left + w_right);
-            }
+        while(current_offset != -1) {
+            current_node = &m_nodes[current_offset];
 
-            if (ln.bbox.contains(emitter->bbox())) {
-                pdf *= p_left;
-                offset += 1;
+            if (current_node->is_leaf()) {
+                pdf /= current_node->prim_count;
             } else {
-                pdf *= (1 - p_left);
-                offset = m_nodes[offset].second_child_offset;
-            }
-        }
+                float w_left, w_right;
+                std::tie(w_left, w_right) = compute_children_weights(current_offset, si);
 
-        pdf /= m_nodes[offset].prim_count;
+                int first_child_offest = current_offset + 1;
+                const LinearBVHNode ln = m_nodes[first_child_offest];
+                const LinearBVHNode rn = m_nodes[m_nodes[current_offset].second_child_offset];
+
+                float p_left = 0.5f;
+                if (w_left + w_right >= std::numeric_limits<float>::epsilon()) {
+                    p_left = w_left / (w_left + w_right);
+                }
+
+                if (prev_offset == first_child_offest) {
+                    pdf *= p_left;
+                } else {
+                    pdf *= (1.f - p_left);
+                }
+            }
+
+            prev_offset = current_offset;
+            current_offset = current_node->parent_offset;
+        }
 
         return pdf;
     }
@@ -264,7 +308,7 @@ protected:
                              int start,
                              int end,
                              int *total_nodes,
-                             host_vector<ref<Emitter>, Float> &ordered_prims,
+                             std::vector<BVHPrimitive*> &ordered_prims,
                              std::string node_name = "") {
         BVHNode* node;
         (*total_nodes)++;
@@ -375,21 +419,26 @@ protected:
         return node;
     }
 
-    int flatten_bvh_tree(BVHNode *node, int *offset) {
+    int flatten_bvh_tree(BVHNode *node, int *offset, int parent_offset) {
         LinearBVHNode *linear_node = &m_nodes[*offset];
         linear_node->bbox = node->bbox;
         linear_node->bcone = node->bcone;
         linear_node->intensity = node->intensity;
+        linear_node->parent_offset = parent_offset;
         int my_offset = (*offset)++;
 
         if (node->prim_count > 0) {
             linear_node->primitives_offset = node->first_prim_offset;
             linear_node->prim_count = node->prim_count;
+
+            for (int i = 0; i < linear_node->prim_count; i++) {
+                m_primitives[linear_node->primitives_offset + i]->leaf_offset = my_offset;
+            }
         } else {
             linear_node->axis = node->split_axis;
             linear_node->prim_count = 0;
-            flatten_bvh_tree(node->children[0], offset);
-            linear_node->second_child_offset = flatten_bvh_tree(node->children[1], offset);
+            flatten_bvh_tree(node->children[0], offset, my_offset);
+            linear_node->second_child_offset = flatten_bvh_tree(node->children[1], offset, my_offset);
         }
 
         return my_offset;
@@ -530,7 +579,7 @@ private:
     BVHNode* create_leaf(std::vector<BVHPrimInfo> &primitive_info,
                          int start,
                          int end,
-                         host_vector<ref<Emitter>, Float> &ordered_prims,
+                         std::vector<BVHPrimitive*> &ordered_prims,
                          ScalarBoundingBox3f &prims_bbox,
                          Spectrum intensity = 0.f,
                          ScalarCone3f cone = ScalarCone3f()) {
@@ -642,7 +691,7 @@ private:
 private:
     const int m_max_prims_in_node;
     const SplitMethod m_split_method;
-    host_vector<ref<Emitter>, Float> m_primitives;
+    std::vector<BVHPrimitive*> m_primitives;
     LinearBVHNode *m_nodes = nullptr;
     int m_total_nodes;
     bool m_visualize_volumes;
