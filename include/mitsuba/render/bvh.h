@@ -15,14 +15,24 @@ enum class SplitMethod { SAH, SAOH, Middle, EqualCounts };
 
 MTS_VARIANT class BVH : public Object {
 public:
-    MTS_IMPORT_TYPES(Emitter)
+    MTS_IMPORT_TYPES(Emitter, Shape, Mesh)
 
     BVH(host_vector<ref<Emitter>, Float> p, int max_prims_in_node, SplitMethod split_method, bool visualize_volumes = false):
         m_max_prims_in_node(std::min(255, max_prims_in_node)), m_split_method(split_method), m_visualize_volumes(visualize_volumes) {
 
-        m_primitives = std::vector<BVHPrimitive*>(p.size());
+        m_primitives = std::vector<BVHPrimitive*>();
         for (size_t i = 0; i < p.size(); i++) {
-            m_primitives[i] = new BVHPrimitive(p[i]);
+            Shape *shape = p[i].get()->shape();
+            if (shape->is_mesh()) {
+                Mesh *mesh = static_cast<Mesh*>(shape);
+                const uint8_t *faces = mesh->faces();
+                for (size_t j = 0; j < mesh->face_count(); j++) {
+                    uint8_t face_id = faces[j];
+                    m_primitives.push_back(new BVHPrimitive(p[i], face_id, mesh->face_bbox(face_id), mesh->face_cone(face_id)));
+                }
+            } else {
+                m_primitives.push_back(new BVHPrimitive(p[i]));
+            }
         }
 
         if (m_primitives.size() == 0) {
@@ -65,11 +75,12 @@ public:
 
     std::pair<DirectionSample3f, Spectrum> sample_emitter(const Float &tree_sample, const SurfaceInteraction3f &ref, const Point2f &emitter_sample, const Mask active) {
         float pdf = 1.0f;
-        Emitter* emitter = sample_tree(ref, pdf, tree_sample);
+
+        BVHPrimitive *prim = sample_tree(ref, pdf, tree_sample);
 
         DirectionSample3f ds;
         Spectrum spec;
-        std::tie(ds, spec) = emitter->sample_direction(ref, emitter_sample, active);
+        std::tie(ds, spec) = prim->sample_direction(ref, emitter_sample, active);
 
         ds.pdf *= pdf;
         return std::pair(ds, spec / pdf);
@@ -123,6 +134,7 @@ protected:
         ScalarCone3f cone;
     };
 
+    // TODO: Refactor to use union to save some space ?
     struct BVHNode {
         void init_leaf(int first, int n, const ScalarBoundingBox3f &box, Spectrum e_intensity, ScalarCone3f cone) {
             first_prim_offset = first;
@@ -176,29 +188,70 @@ protected:
     };
 
     struct BVHPrimitive {
-        BVHPrimitive(Emitter *emitter) : emitter(emitter), leaf_offset(-1) {}
+        BVHPrimitive(Emitter *emitter) : emitter(emitter), leaf_offset(-1), is_triangle(false), face_id(0) {
+            prim_bbox = ScalarBoundingBox3f();
+            prim_cone = ScalarCone3f();
+        }
+
+        BVHPrimitive(Emitter *emitter, uint8_t face_id, ScalarBoundingBox3f bbox, ScalarCone3f cone) : BVHPrimitive(emitter) {
+            is_triangle = true;
+            this->face_id = face_id;
+            prim_bbox = bbox;
+            prim_cone = cone;
+        }
+
         Emitter *emitter;
         int leaf_offset;
 
+        bool is_triangle;
+        uint8_t face_id;
+        ScalarBoundingBox3f prim_bbox;
+        ScalarCone3f prim_cone;
+
+
         inline ScalarBoundingBox3f bbox() {
+            if (is_triangle) {
+                return prim_bbox;
+            }
+
             return emitter->bbox();
         }
 
         inline ScalarCone3f cone() {
+            if (is_triangle) {
+                return prim_cone;
+            }
+
             return emitter->cone();
         }
 
         inline Spectrum get_total_radiance() {
+            if (is_triangle) {
+                const Shape *shape = emitter->shape();
+                const Mesh *mesh = static_cast<const Mesh*>(shape);
+                Float tri_area = mesh->face_area(face_id);
+                return emitter->get_radiance() * tri_area;
+            }
+
             return emitter->get_total_radiance();
         }
 
+        inline std::pair<DirectionSample3f, Spectrum> sample_direction(const SurfaceInteraction3f &ref, const Point2f &emitter_sample, const Mask active) {
+            if (is_triangle) {
+                emitter->sample_face_direction(face_id, ref, emitter_sample, active);
+            }
+
+            return emitter->sample_direction(ref, emitter_sample, active);
+        }
+
         inline bool operator==(const BVHPrimitive &prim){
-            return emitter == prim.emitter;
+            return emitter == prim.emitter &&
+                   face_id == prim.face_id;
         }
     };
 
 protected:
-    Emitter* sample_tree(const SurfaceInteraction3f &si, float &importance_ratio, const Float &sample_) {
+    BVHPrimitive* sample_tree(const SurfaceInteraction3f &si, float &importance_ratio, const Float &sample_) {
         importance_ratio = 1.0;
         Float sample(sample_);
 
@@ -235,7 +288,7 @@ protected:
         prim_offset += leaf_offset;
         importance_ratio /= leaf_prim_count;
 
-        return m_primitives[prim_offset]->emitter;
+        return m_primitives[prim_offset];
     }
 
     Float pdf_tree(const SurfaceInteraction3f &si, const Emitter *emitter) {

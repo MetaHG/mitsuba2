@@ -115,6 +115,33 @@ public:
         return 0.5f * norm(cross(p1 - p0, p2 - p0));
     }
 
+    template <typename Index>
+    auto face_bbox(Index index, mask_t<Index> active = true) const {
+        auto fi = face_indices(index, active);
+
+        auto p0 = vertex_position(fi[0], active),
+             p1 = vertex_position(fi[1], active),
+             p2 = vertex_position(fi[2], active);
+
+        ScalarBoundingBox3f bbox(p0);
+        bbox.expand(p1);
+        bbox.expand(p2);
+
+        return bbox;
+    }
+
+    template <typename Index>
+    auto face_cone(Index index, mask_t<Index> active = true) const {
+        auto fi = face_indices(index, active);
+
+        auto p0 = vertex_position(fi[0], active),
+             p1 = vertex_position(fi[1], active),
+             p2 = vertex_position(fi[2], active);
+
+        auto n = norm(cross(p1 - p0, p2 - p0));
+        return ScalarCone3f(n, 0, M_PI_2);
+    }
+
     /// Does this mesh have per-vertex normals?
     bool has_vertex_normals() const { return slices(m_vertex_normals_buf) != 0; }
 
@@ -150,6 +177,11 @@ public:
 
     virtual PositionSample3f sample_position(Float time, const Point2f &sample,
                                              Mask active = true) const override;
+
+    virtual PositionSample3f sample_face_position(ScalarIndex face_idx,
+                                                  Float time,
+                                                  const Point2f &sample,
+                                                  Mask active = true) const override;
 
     virtual Float pdf_position(const PositionSample3f &ps, Mask active = true) const override;
 

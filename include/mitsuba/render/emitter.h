@@ -65,6 +65,8 @@ public:
     MTS_IMPORT_BASE(Endpoint)
     MTS_IMPORT_CORE_TYPES()
 
+    using typename Base::ScalarIndex;
+
     /// Is this an environment map light emitter?
     bool is_environment() const {
         return has_flag(m_flags, EmitterFlags::Infinite) && !has_flag(m_flags, EmitterFlags::Delta);
@@ -80,6 +82,8 @@ public:
 
     /// Flags for all components combined.
     uint32_t flags(mask_t<Float> /*active*/ = true) const { return m_flags; }
+
+    virtual Spectrum get_radiance() const;
 
     virtual Spectrum get_total_radiance() const;
 

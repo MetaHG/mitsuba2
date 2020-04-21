@@ -51,6 +51,11 @@ public:
     virtual PositionSample3f sample_position(Float time, const Point2f &sample,
                                              Mask active = true) const;
 
+    virtual PositionSample3f sample_face_position(ScalarIndex face_idx,
+                                                  Float time,
+                                                  const Point2f &sample,
+                                                  Mask active = true) const;
+
     /**
      * \brief Query the probability density of \ref sample_position() for
      * a particular point on the surface.
@@ -92,6 +97,11 @@ public:
      */
     virtual DirectionSample3f sample_direction(const Interaction3f &it, const Point2f &sample,
                                                Mask active = true) const;
+
+    virtual DirectionSample3f sample_face_direction(const ScalarIndex face_idx,
+                                                    const Interaction3f &it,
+                                                    const Point2f &sample,
+                                                    Mask active = true) const;
 
     /**
      * \brief Query the probability density of \ref sample_direction()

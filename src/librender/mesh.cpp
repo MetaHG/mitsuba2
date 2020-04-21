@@ -326,7 +326,7 @@ Mesh<Float, Spectrum>::sample_position(Float time, const Point2f &sample_, Mask 
     Point2f sample = sample_;
     std::tie(face_idx, sample.y()) = m_area_distr.sample_reuse(sample.y(), active);
 
-    Array<Index, 3> fi = face_indices(face_idx, active);
+    Array<ScalarIndex, 3> fi = face_indices(face_idx, active);
 
     Point3f p0 = vertex_position(fi[0], active),
             p1 = vertex_position(fi[1], active),
@@ -338,7 +338,7 @@ Mesh<Float, Spectrum>::sample_position(Float time, const Point2f &sample_, Mask 
     PositionSample3f ps;
     ps.p     = p0 + e0 * b.x() + e1 * b.y();
     ps.time  = time;
-    ps.pdf   = m_area_distr.normalization();
+    ps.pdf   = m_area_distr.normalization(); // TODO: modify this
     ps.delta = false;
 
     if (has_vertex_texcoords()) {
@@ -364,7 +364,72 @@ Mesh<Float, Spectrum>::sample_position(Float time, const Point2f &sample_, Mask 
     return ps;
 }
 
-MTS_VARIANT Float Mesh<Float, Spectrum>::pdf_position(const PositionSample3f &, Mask) const {
+MTS_VARIANT typename Mesh<Float, Spectrum>::PositionSample3f
+Mesh<Float, Spectrum>::sample_face_position(ScalarIndex face_idx, Float time, const Point2f &sample_, Mask active) const {
+    MTS_MASK_ARGUMENT(active);
+
+    Point2f sample = sample_;
+
+    Array<ScalarIndex, 3> fi = face_indices(face_idx, active);
+
+    Point3f p0 = vertex_position(fi[0], active),
+            p1 = vertex_position(fi[1], active),
+            p2 = vertex_position(fi[2], active);
+
+    Vector3f e0 = p1 - p0, e1 = p2 - p0;
+    Point2f b = warp::square_to_uniform_triangle(sample);
+
+    PositionSample3f ps;
+    ps.p     = p0 + e0 * b.x() + e1 * b.y();
+    ps.time  = time;
+    ps.pdf   = 1.0f / face_area(face_idx, active);
+    ps.delta = false;
+
+    if (has_vertex_texcoords()) {
+        Point2f uv0 = vertex_texcoord(fi[0], active),
+                uv1 = vertex_texcoord(fi[1], active),
+                uv2 = vertex_texcoord(fi[2], active);
+        ps.uv = uv0 * (1.f - b.x() - b.y())
+              + uv1 * b.x() + uv2 * b.y();
+    } else {
+        ps.uv = b;
+    }
+
+    if (has_vertex_normals()) {
+        Normal3f n0 = vertex_normal(fi[0], active),
+                 n1 = vertex_normal(fi[1], active),
+                 n2 = vertex_normal(fi[2], active);
+        ps.n = normalize(n0 * (1.f - b.x() - b.y())
+                       + n1 * b.x() + n2 * b.y());
+    } else {
+        ps.n = normalize(cross(e0, e1));
+    }
+
+    return ps;
+}
+
+MTS_VARIANT ScalarIndex Mesh<Float, Spectrum>::face(const PositionSample3f &ps, Mask active) const {
+    for (size_t i = 0; i < m_face_count; i++) {
+        Array<ScalarIndex, 3> fi = face_indices(face_idx, active);
+
+        Point3f p0 = vertex_position(fi[0], active),
+                p1 = vertex_position(fi[1], active),
+                p2 = vertex_position(fi[2], active);
+
+        Vector3f e0 = p1 - p0, e1 = p2 - p0;
+
+        Normal3f n = normalize(cross(e0, e1));
+
+        Scalar plane_intercept = dot(p0, n);
+        Scalar ps_intercept = dot(ps.p, n);
+        Scalar diff = plane_intercept - ps_intercept;
+        if (diff < std::numeric_limits<Float>::epsilon()) {
+            // TODO: Check that point lies inside the triangle.
+        }
+    }
+}
+
+MTS_VARIANT Float Mesh<Float, Spectrum>::pdf_position(const PositionSample3f &, Mask active) const {
     area_distr_ensure();
     return m_area_distr.normalization();
 }

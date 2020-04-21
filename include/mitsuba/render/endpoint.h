@@ -37,6 +37,9 @@ class MTS_EXPORT_RENDER Endpoint : public Object {
 public:
     MTS_IMPORT_TYPES(Medium, Scene, Shape)
 
+    // Use 32 bit indices to keep track of indices to conserve memory
+    using ScalarIndex = uint32_t;
+
     // =============================================================
     //! @{ \name Sampling interface
     // =============================================================
@@ -112,6 +115,12 @@ public:
      */
     virtual std::pair<DirectionSample3f, Spectrum>
     sample_direction(const Interaction3f &ref,
+                     const Point2f &sample,
+                     Mask active = true) const;
+
+    virtual std::pair<DirectionSample3f, Spectrum>
+    sample_face_direction(const ScalarIndex face_idx,
+                     const Interaction3f &ref,
                      const Point2f &sample,
                      Mask active = true) const;
 

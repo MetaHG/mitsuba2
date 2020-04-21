@@ -93,6 +93,15 @@ Shape<Float, Spectrum>::sample_position(Float /*time*/, const Point2f & /*sample
     NotImplementedError("sample_position");
 }
 
+
+MTS_VARIANT typename Shape<Float, Spectrum>::PositionSample3f
+Shape<Float, Spectrum>::sample_face_position(ScalarIndex /*face_idx*/,
+                                             Float /*time*/,
+                                             const Point2f & /*sample*/,
+                                             Mask /*active*/) const {
+    NotImplementedError("sample_face_position");
+}
+
 MTS_VARIANT Float Shape<Float, Spectrum>::pdf_position(const PositionSample3f & /*ps*/, Mask /*active*/) const {
     NotImplementedError("pdf_position");
 }
@@ -249,6 +258,8 @@ MTS_VARIANT void Shape<Float, Spectrum>::optix_build_input(OptixBuildInput &buil
 }
 #endif
 
+
+// TODO: Refactor to use sample_face_direction instead?
 MTS_VARIANT typename Shape<Float, Spectrum>::DirectionSample3f
 Shape<Float, Spectrum>::sample_direction(const Interaction3f &it,
                                          const Point2f &sample,
@@ -256,6 +267,27 @@ Shape<Float, Spectrum>::sample_direction(const Interaction3f &it,
     MTS_MASK_ARGUMENT(active);
 
     DirectionSample3f ds(sample_position(it.time, sample, active));
+    ds.d = ds.p - it.p;
+
+    Float dist_squared = squared_norm(ds.d);
+    ds.dist = sqrt(dist_squared);
+    ds.d /= ds.dist;
+
+    Float dp = abs_dot(ds.d, ds.n);
+    ds.pdf *= select(neq(dp, 0.f), dist_squared / dp, 0.f);
+    ds.object = (const Object *) this;
+
+    return ds;
+}
+
+MTS_VARIANT typename Shape<Float, Spectrum>::DirectionSample3f
+Shape<Float, Spectrum>::sample_face_direction(const ScalarIndex face_idx,
+                                              const Interaction3f &it,
+                                              const Point2f &sample,
+                                              Mask active) const {
+    MTS_MASK_ARGUMENT(active);
+
+    DirectionSample3f ds(sample_face_position(face_idx, it.time, sample, active));
     ds.d = ds.p - it.p;
 
     Float dist_squared = squared_norm(ds.d);
