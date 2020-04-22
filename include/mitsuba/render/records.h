@@ -129,6 +129,7 @@ struct DirectionSample : public PositionSample<Float_, Spectrum_> {
     using Interaction3f        = typename RenderAliases::Interaction3f;
     using SurfaceInteraction3f = typename RenderAliases::SurfaceInteraction3f;
     using ObjectPtr            = typename RenderAliases::ObjectPtr;
+    using Index            = typename CoreAliases::UInt32;
 
     //! @}
     // =============================================================
@@ -142,6 +143,9 @@ struct DirectionSample : public PositionSample<Float_, Spectrum_> {
 
     /// Distance from the reference point to the target shape
     Float dist;
+
+    /// Primitive index, e.g. the triangle ID (if applicable)
+    Index prim_index;
 
     //! @}
     // =============================================================
@@ -171,6 +175,7 @@ struct DirectionSample : public PositionSample<Float_, Spectrum_> {
         dist = norm(d);
         d   /= dist;
         d[!it.is_valid()] = -it.wi; // for environment emitters
+        prim_index = it.prim_index;
     }
 
     /// Element-by-element constructor
