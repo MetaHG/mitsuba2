@@ -139,6 +139,10 @@ public:
                                 const DirectionSample3f &ds,
                                 Mask active = true) const;
 
+    virtual Float pdf_face_direction(ScalarIndex &face_idx,
+                                     const Interaction3f &ref,
+                                     const DirectionSample3f &ds,
+                                     Mask active) const;
     //! @}
     // =============================================================
 

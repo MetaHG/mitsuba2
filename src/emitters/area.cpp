@@ -47,6 +47,8 @@ public:
     MTS_IMPORT_BASE(Emitter, m_flags, m_shape, m_medium, m_bbox, m_cone)
     MTS_IMPORT_TYPES(Scene, Shape, Texture)
 
+    using typename Base::ScalarIndex;
+
     AreaLight(const Properties &props) : Base(props) {
         if (props.has_property("to_world"))
             Throw("Found a 'to_world' transformation -- this is not allowed. "
@@ -118,12 +120,36 @@ public:
         return { ds, unpolarized<Spectrum>(spec) & active };
     }
 
+    std::pair<DirectionSample3f, Spectrum>
+    sample_face_direction(const ScalarIndex face_idx, const Interaction3f &it, const Point2f &sample, Mask active) const override {
+        MTS_MASKED_FUNCTION(ProfilerPhase::EndpointSampleDirection, active);
+
+        Assert(m_shape, "Can't sample from an area emitter without an associated Shape.");
+
+        DirectionSample3f ds = m_shape->sample_face_direction(face_idx, it, sample, active);
+        active &= dot(ds.d, ds.n) < 0.f && neq(ds.pdf, 0.f);
+
+        SurfaceInteraction3f si(ds, it.wavelengths);
+        Spectrum spec = m_radiance->eval(si, active) / ds.pdf;
+
+        ds.object = this;
+        return { ds, unpolarized<Spectrum>(spec) & active };
+    }
+
     Float pdf_direction(const Interaction3f &it, const DirectionSample3f &ds,
                         Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::EndpointEvaluate, active);
 
         return select(dot(ds.d, ds.n) < 0.f,
                       m_shape->pdf_direction(it, ds, active), 0.f);
+    }
+
+    Float pdf_face_direction(ScalarIndex &face_idx, const Interaction3f &it, const DirectionSample3f &ds,
+                        Mask active) const override {
+        MTS_MASKED_FUNCTION(ProfilerPhase::EndpointEvaluate, active);
+
+        return select(dot(ds.d, ds.n) < 0.f,
+                      m_shape->pdf_face_direction(face_idx, it, ds, active), 0.f);
     }
 
     ScalarBoundingBox3f bbox() const override { return m_shape->bbox(); }
@@ -139,6 +165,19 @@ public:
         si.wavelengths = wavelengths;
 
         return m_radiance->eval(si) * m_shape->surface_area();
+    }
+
+    Spectrum get_radiance() const override {
+        //TODO: OVERRIDE TO IMPLEMENT CORRECT RADIANCE
+        SurfaceInteraction3f si = zero<SurfaceInteraction3f>();
+
+        wavelength_t<Spectrum> wavelengths;
+        Spectrum wavelengths_weight;
+        std::tie(wavelengths, wavelengths_weight) = sample_wavelength<Float, Spectrum>(std::rand() / (double) RAND_MAX); // Should not use random, nor sample_wavelength
+
+        si.wavelengths = wavelengths;
+
+        return m_radiance->eval(si);
     }
 
     void traverse(TraversalCallback *callback) override {

@@ -106,6 +106,10 @@ MTS_VARIANT Float Shape<Float, Spectrum>::pdf_position(const PositionSample3f & 
     NotImplementedError("pdf_position");
 }
 
+MTS_VARIANT Float Shape<Float, Spectrum>::pdf_face_position(ScalarIndex & /*face_idx*/, const PositionSample3f & /*ps*/, Mask /*active*/) const {
+    NotImplementedError("pdf_face_position");
+}
+
 #if defined(MTS_ENABLE_EMBREE)
 template <typename Float, typename Spectrum>
 void embree_bbox(const struct RTCBoundsFunctionArguments* args) {
@@ -307,6 +311,20 @@ MTS_VARIANT Float Shape<Float, Spectrum>::pdf_direction(const Interaction3f & /*
     MTS_MASK_ARGUMENT(active);
 
     Float pdf = pdf_position(ds, active),
+           dp = abs_dot(ds.d, ds.n);
+
+    pdf *= select(neq(dp, 0.f), (ds.dist * ds.dist) / dp, 0.f);
+
+    return pdf;
+}
+
+MTS_VARIANT Float Shape<Float, Spectrum>::pdf_face_direction(ScalarIndex &face_idx,
+                                                        const Interaction3f & /*it*/,
+                                                        const DirectionSample3f &ds,
+                                                        Mask active) const {
+    MTS_MASK_ARGUMENT(active);
+
+    Float pdf = pdf_face_position(face_idx, ds, active),
            dp = abs_dot(ds.d, ds.n);
 
     pdf *= select(neq(dp, 0.f), (ds.dist * ds.dist) / dp, 0.f);

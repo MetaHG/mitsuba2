@@ -142,6 +142,8 @@ public:
         return ScalarCone3f(n, 0, M_PI_2);
     }
 
+    virtual ScalarIndex face(const PositionSample3f &ps, Mask active) const;
+
     /// Does this mesh have per-vertex normals?
     bool has_vertex_normals() const { return slices(m_vertex_normals_buf) != 0; }
 
@@ -184,6 +186,8 @@ public:
                                                   Mask active = true) const override;
 
     virtual Float pdf_position(const PositionSample3f &ps, Mask active = true) const override;
+
+    virtual Float pdf_face_position(ScalarIndex &face_idx, const PositionSample3f &ps, Mask active = true) const override;
 
     virtual Point3f
     barycentric_coordinates(const SurfaceInteraction3f &si,

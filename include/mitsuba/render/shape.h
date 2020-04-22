@@ -68,6 +68,9 @@ public:
      */
     virtual Float pdf_position(const PositionSample3f &ps, Mask active = true) const;
 
+    virtual Float pdf_face_position(ScalarIndex &face_idx,
+                                    const PositionSample3f &ps,
+                                    Mask active = true) const;
     /**
      * \brief Sample a direction towards this shape with respect to solid
      * angles measured at a reference position within the scene
@@ -117,6 +120,11 @@ public:
      */
     virtual Float pdf_direction(const Interaction3f &it, const DirectionSample3f &ds,
                                 Mask active = true) const;
+
+    virtual Float pdf_face_direction(ScalarIndex &face_idx,
+                                     const Interaction3f &it,
+                                     const DirectionSample3f &ds,
+                                     Mask active = true) const;
 
     //! @}
     // =============================================================

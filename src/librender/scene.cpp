@@ -167,30 +167,32 @@ Scene<Float, Spectrum>::sample_emitter_direction_custom(const SurfaceInteraction
     Spectrum spec;
 
     if (likely(!m_emitters.empty())) {
-        if (m_emitters.size() == 1) {
-            // Fast path if there is only one emitter
-            std::tie(ds, spec) = m_emitters[0]->sample_direction(ref, sample, active);
-        } else {
-//            ScalarFloat emitter_pdf = 1.f / m_emitters.size();
+//        if (m_emitters.size() == 1) {
+//            // Fast path if there is only one emitter
+//            std::tie(ds, spec) = m_emitters[0]->sample_direction(ref, sample, active);
+//        } else {
+////            ScalarFloat emitter_pdf = 1.f / m_emitters.size();
 
-//            // Randomly pick an emitter
-//            UInt32 index = min(UInt32(sample.x() * (ScalarFloat) m_emitters.size()), (uint32_t) m_emitters.size()-1);
+////            // Randomly pick an emitter
+////            UInt32 index = min(UInt32(sample.x() * (ScalarFloat) m_emitters.size()), (uint32_t) m_emitters.size()-1);
 
-//            // Rescale sample.x() to lie in [0,1) again
-//            sample.x() = (sample.x() - index*emitter_pdf) * m_emitters.size();
+////            // Rescale sample.x() to lie in [0,1) again
+////            sample.x() = (sample.x() - index*emitter_pdf) * m_emitters.size();
 
-//            EmitterPtr emitter = gather<EmitterPtr>(m_emitters.data(), index, active);
+////            EmitterPtr emitter = gather<EmitterPtr>(m_emitters.data(), index, active);
 
-//            // Sample a direction towards the emitter
-//            std::tie(ds, spec) = emitter->sample_direction(ref, sample, active);
+////            // Sample a direction towards the emitter
+////            std::tie(ds, spec) = emitter->sample_direction(ref, sample, active);
 
-//            // Account for the discrete probability of sampling this emitter
-//            ds.pdf *= emitter_pdf;
-//            spec *= rcp(emitter_pdf);
+////            // Account for the discrete probability of sampling this emitter
+////            ds.pdf *= emitter_pdf;
+////            spec *= rcp(emitter_pdf);
 
-            std::tie(ds, spec) = m_bvh->sample_emitter(tree_sample, ref, sample, active);
-            //std::tie(ds, spec) = m_lighttree->sample_emitter(tree_sample, ref, sample, active);
-        }
+//            std::tie(ds, spec) = m_bvh->sample_emitter(tree_sample, ref, sample, active);
+//            //std::tie(ds, spec) = m_lighttree->sample_emitter(tree_sample, ref, sample, active);
+//        }
+
+        std::tie(ds, spec) = m_bvh->sample_emitter(tree_sample, ref, sample, active);
 
         active &= neq(ds.pdf, 0.f);
 
@@ -216,13 +218,15 @@ Scene<Float, Spectrum>::pdf_emitter_direction_custom(const SurfaceInteraction3f 
     using EmitterPtr = replace_scalar_t<Float, const Emitter *>;
 
 
-    if (m_emitters.size() == 1) {
-        // Fast path if there is only one emitter
-        return m_emitters[0]->pdf_direction(ref, ds, active);
-    } else {
-        return reinterpret_array<EmitterPtr>(ds.object)->pdf_direction(ref, ds, active) *
-            m_bvh->pdf_emitter(ref, reinterpret_array<EmitterPtr>(ds.object));
-    }
+//    if (m_emitters.size() == 1) {
+//        // Fast path if there is only one emitter
+//        return m_emitters[0]->pdf_direction(ref, ds, active);
+//    } else {
+////        return reinterpret_array<EmitterPtr>(ds.object)->pdf_direction(ref, ds, active) *
+////            m_bvh->pdf_emitter(ref, reinterpret_array<EmitterPtr>(ds.object));
+//        return m_bvh->pdf_emitter_direction(ref, ds, active);
+//    }
+    return m_bvh->pdf_emitter_direction(ref, ds, active);
 }
 
 MTS_VARIANT std::pair<typename Scene<Float, Spectrum>::DirectionSample3f, Spectrum>

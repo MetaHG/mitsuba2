@@ -17,6 +17,10 @@ MTS_VARIANT class BVH : public Object {
 public:
     MTS_IMPORT_TYPES(Emitter, Shape, Mesh)
 
+    // Use 32 bit indices to keep track of indices to conserve memory
+    using ScalarIndex = uint32_t; // TODO: See how to import this from shape
+    using EmitterPtr = replace_scalar_t<Float, const Emitter *>;
+
     BVH(host_vector<ref<Emitter>, Float> p, int max_prims_in_node, SplitMethod split_method, bool visualize_volumes = false):
         m_max_prims_in_node(std::min(255, max_prims_in_node)), m_split_method(split_method), m_visualize_volumes(visualize_volumes) {
 
@@ -86,8 +90,21 @@ public:
         return std::pair(ds, spec / pdf);
     }
 
-    Float pdf_emitter(const SurfaceInteraction3f &ref, const Emitter* emitter) {
-        return pdf_tree(ref, emitter);
+    Float pdf_emitter_direction(const SurfaceInteraction3f &ref,
+                                const DirectionSample3f &ds,
+                                Mask active) {
+        const Emitter *emitter = reinterpret_array<EmitterPtr>(ds.object);
+        const Shape *shape = emitter->shape();
+        ScalarIndex face_idx = 0;
+
+        Float emitter_pdf = 1.0f;
+        if (shape->is_mesh()) {
+            emitter_pdf = emitter->pdf_face_direction(face_idx, ref, ds, active);
+        } else {
+            emitter_pdf = emitter->pdf_direction(ref, ds, active);
+        }
+
+        return emitter_pdf * pdf_tree(ref, emitter, face_idx);
     }
 
     void to_obj() {
@@ -291,11 +308,11 @@ protected:
         return m_primitives[prim_offset];
     }
 
-    Float pdf_tree(const SurfaceInteraction3f &si, const Emitter *emitter) {
+    Float pdf_tree(const SurfaceInteraction3f &si, const Emitter *emitter, const ScalarIndex face_idx) {
         Float pdf = 1.0;
 
         typename std::vector<BVHPrimitive*>::iterator it = std::find_if(m_primitives.begin(), m_primitives.end(),
-                                                                        [emitter](BVHPrimitive* p) {return p->emitter == emitter; });
+                                                                        [emitter, face_idx](BVHPrimitive* p) {return p->emitter == emitter && p->face_id == face_idx; });
         BVHPrimitive* prim = *it;
 
         int prev_offset;
