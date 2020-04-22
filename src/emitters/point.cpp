@@ -107,7 +107,8 @@ public:
 
     Spectrum eval(const SurfaceInteraction3f &, Mask) const override { return 0.f; }
 
-    Spectrum get_total_radiance() const override {
+    Spectrum get_radiance() const override {
+        //TODO: OVERRIDE TO IMPLEMENT CORRECT RADIANCE
         SurfaceInteraction3f si = zero<SurfaceInteraction3f>();
 
         wavelength_t<Spectrum> wavelengths;
@@ -117,6 +118,10 @@ public:
         si.wavelengths = wavelengths;
 
         return m_intensity->eval(si);
+    }
+
+    Spectrum get_total_radiance() const override {
+        return get_radiance();
     }
 
     ScalarBoundingBox3f bbox() const override {
