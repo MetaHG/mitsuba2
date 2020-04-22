@@ -253,7 +253,7 @@ protected:
 
         inline std::pair<DirectionSample3f, Spectrum> sample_direction(const SurfaceInteraction3f &ref, const Point2f &emitter_sample, const Mask active) {
             if (is_triangle) {
-                emitter->sample_face_direction(face_id, ref, emitter_sample, active);
+                return emitter->sample_face_direction(face_id, ref, emitter_sample, active);
             }
 
             return emitter->sample_direction(ref, emitter_sample, active);
