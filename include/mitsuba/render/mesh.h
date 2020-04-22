@@ -138,8 +138,19 @@ public:
              p1 = vertex_position(fi[1], active),
              p2 = vertex_position(fi[2], active);
 
-        auto n = norm(cross(p1 - p0, p2 - p0));
-        return ScalarCone3f(n, 0, M_PI_2);
+        ScalarCone3f cone(normalize(cross(p1 - p0, p2 - p0)), 0, M_PI_2);
+
+        if (has_vertex_normals()) {
+            Normal3f n0 = vertex_normal(fi[0], active),
+                     n1 = vertex_normal(fi[1], active),
+                     n2 = vertex_normal(fi[2], active);
+
+            cone = ScalarCone3f::merge(cone, ScalarCone3f(n0, 0, M_PI_2));
+            cone = ScalarCone3f::merge(cone, ScalarCone3f(n1, 0, M_PI_2));
+            cone = ScalarCone3f::merge(cone, ScalarCone3f(n2, 0, M_PI_2));
+        }
+
+        return cone;
     }
 
     virtual ScalarIndex face(const PositionSample3f &ps, Mask active) const;
