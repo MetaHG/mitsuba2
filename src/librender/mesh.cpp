@@ -451,8 +451,7 @@ MTS_VARIANT Float Mesh<Float, Spectrum>::pdf_position(const PositionSample3f &, 
     return m_area_distr.normalization();
 }
 
-MTS_VARIANT Float Mesh<Float, Spectrum>::pdf_face_position(ScalarIndex &face_idx, const PositionSample3f &ps, Mask active) const {
-    face_idx = face(ps, active);
+MTS_VARIANT Float Mesh<Float, Spectrum>::pdf_face_position(ScalarIndex &face_idx, const PositionSample3f &, Mask active) const {
     return 1.0f / face_area(face_idx, active);
 }
 

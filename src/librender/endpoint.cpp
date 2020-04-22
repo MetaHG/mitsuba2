@@ -60,6 +60,13 @@ MTS_VARIANT Float Endpoint<Float, Spectrum>::pdf_direction(const Interaction3f &
     NotImplementedError("pdf_direction");
 }
 
+MTS_VARIANT Float Endpoint<Float, Spectrum>::pdf_face_direction(ScalarIndex & /*face_idx*/,
+                                                                const Interaction3f & /*it*/,
+                                                                const DirectionSample3f & /*ds*/,
+                                                                Mask /*active*/) const {
+    NotImplementedError("pdf_face_direction");
+}
+
 MTS_VARIANT Spectrum Endpoint<Float, Spectrum>::eval(const SurfaceInteraction3f & /*si*/,
                                                      Mask /*active*/) const {
     NotImplementedError("eval");

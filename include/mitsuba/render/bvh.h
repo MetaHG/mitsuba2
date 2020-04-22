@@ -29,10 +29,8 @@ public:
             Shape *shape = p[i].get()->shape();
             if (shape->is_mesh()) {
                 Mesh *mesh = static_cast<Mesh*>(shape);
-                const uint8_t *faces = mesh->faces();
-                for (size_t j = 0; j < mesh->face_count(); j++) {
-                    uint8_t face_id = faces[j];
-                    m_primitives.push_back(new BVHPrimitive(p[i], face_id, mesh->face_bbox(face_id), mesh->face_cone(face_id)));
+                for (ScalarIndex j = 0; j < mesh->face_count(); j++) {
+                    m_primitives.push_back(new BVHPrimitive(p[i], j, mesh->face_bbox(j), mesh->face_cone(j)));
                 }
             } else {
                 m_primitives.push_back(new BVHPrimitive(p[i]));
@@ -95,7 +93,7 @@ public:
                                 Mask active) {
         const Emitter *emitter = reinterpret_array<EmitterPtr>(ds.object);
         const Shape *shape = emitter->shape();
-        ScalarIndex face_idx = 0;
+        ScalarIndex face_idx = ds.prim_index;
 
         Float emitter_pdf = 1.0f;
         if (shape->is_mesh()) {
