@@ -208,7 +208,7 @@ protected:
             prim_cone = ScalarCone3f();
         }
 
-        BVHPrimitive(Emitter *emitter, uint8_t face_id, ScalarBoundingBox3f bbox, ScalarCone3f cone) : BVHPrimitive(emitter) {
+        BVHPrimitive(Emitter *emitter, ScalarIndex face_id, ScalarBoundingBox3f bbox, ScalarCone3f cone) : BVHPrimitive(emitter) {
             is_triangle = true;
             this->face_id = face_id;
             prim_bbox = bbox;
@@ -219,7 +219,7 @@ protected:
         int leaf_offset;
 
         bool is_triangle;
-        uint8_t face_id;
+        ScalarIndex face_id;
         ScalarBoundingBox3f prim_bbox;
         ScalarCone3f prim_cone;
 
