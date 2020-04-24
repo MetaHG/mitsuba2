@@ -40,7 +40,6 @@ add_library(mitsuba-render-obj OBJECT
   ${INC_DIR}/records.h
   ${INC_DIR}/volume_texture.h
   ${INC_DIR}/lighttree.h
-  ${INC_DIR}/bvh.h
 
   bsdf.cpp         ${INC_DIR}/bsdf.h
   emitter.cpp      ${INC_DIR}/emitter.h
@@ -51,6 +50,7 @@ add_library(mitsuba-render-obj OBJECT
   integrator.cpp   ${INC_DIR}/integrator.h
                    ${INC_DIR}/interaction.h
   kdtree.cpp       ${INC_DIR}/kdtree.h
+  bvh.cpp          ${INC_DIR}/bvh.h
   medium.cpp       ${INC_DIR}/medium.h
   mesh.cpp         ${INC_DIR}/mesh.h
   microfacet.cpp   ${INC_DIR}/microfacet.h
