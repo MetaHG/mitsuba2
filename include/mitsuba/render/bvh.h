@@ -327,15 +327,12 @@ protected:
                 float w_left, w_right;
                 std::tie(w_left, w_right) = compute_children_weights(current_offset, si);
 
-                int first_child_offest = current_offset + 1;
-                const LinearBVHNode ln = m_nodes[first_child_offest];
-                const LinearBVHNode rn = m_nodes[m_nodes[current_offset].second_child_offset];
-
                 float p_left = 0.5f;
                 if (w_left + w_right >= std::numeric_limits<float>::epsilon()) {
                     p_left = w_left / (w_left + w_right);
                 }
 
+                int first_child_offest = current_offset + 1;
                 if (prev_offset == first_child_offest) {
                     pdf *= p_left;
                 } else {
@@ -351,8 +348,8 @@ protected:
     }
 
     std::pair<float, float> compute_children_weights(int offset, const SurfaceInteraction3f &ref) {
-        const LinearBVHNode ln = m_nodes[offset + 1];
-        const LinearBVHNode rn = m_nodes[m_nodes[offset].second_child_offset];
+        const LinearBVHNode &ln = m_nodes[offset + 1];
+        const LinearBVHNode &rn = m_nodes[m_nodes[offset].second_child_offset];
 
         float l_weight = compute_cone_weight(ln, ref);
         float r_weight = compute_cone_weight(rn, ref);
@@ -360,16 +357,16 @@ protected:
         l_weight *= compute_luminance(ln.intensity);
         r_weight *= compute_luminance(rn.intensity);
 
-        float left_d = ln.bbox.distance(ref.p);
-        float right_d = rn.bbox.distance(ref.p);
+        float left_d = ln.bbox.squared_distance(ref.p);
+        float right_d = rn.bbox.squared_distance(ref.p);
 
         float distance_ratio = 1.0f; //TODO: DEFINE IT
-        if (left_d <= distance_ratio * norm(ln.bbox.extents())
-            || right_d <= distance_ratio * norm(rn.bbox.extents())) {
+        if (left_d <= distance_ratio * squared_norm(ln.bbox.extents())
+            || right_d <= distance_ratio * squared_norm(rn.bbox.extents())) {
             return std::pair(l_weight, r_weight);
         }
 
-        return std::pair(l_weight / (left_d * left_d), r_weight / (right_d * right_d));
+        return std::pair(l_weight / left_d, r_weight / right_d);
     }
 
     BVHNode* recursive_build(std::vector<BVHPrimInfo> &primitive_info,
@@ -622,7 +619,7 @@ private:
         }
     }
 
-    float compute_cone_weight(const LinearBVHNode &node, const SurfaceInteraction3f &si){
+    MTS_INLINE float compute_cone_weight(const LinearBVHNode &node, const SurfaceInteraction3f &si){
         ScalarVector3f p_to_box_center = node.bbox.center() - si.p;
 
         float in_angle = acos(dot(normalize(p_to_box_center), si.n));
