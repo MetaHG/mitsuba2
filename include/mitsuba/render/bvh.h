@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <unordered_map>
 
 NAMESPACE_BEGIN(mitsuba)
 
@@ -255,10 +256,20 @@ private:
         return oss.str();
     }
 
+    struct HashPair {
+        template<class T1, class T2>
+        size_t operator() (const std::pair<T1, T2> &p) const {
+            auto hash1 = std::hash<T1>{}(p.first);
+            auto hash2 = std::hash<T2>{}(p.second);
+            return hash1 ^ (hash2 << 1);
+        }
+    };
+
 private:
     const int m_max_prims_in_node;
     const SplitMethod m_split_method;
     std::vector<BVHPrimitive*> m_primitives;
+    std::unordered_map<std::pair<std::string, ScalarIndex>, ScalarIndex, HashPair> m_prim_index_map;
     LinearBVHNode *m_nodes = nullptr;
     int m_total_nodes;
     bool m_visualize_volumes;

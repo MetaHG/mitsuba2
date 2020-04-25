@@ -57,6 +57,11 @@ MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int ma
     root = recursive_build(prim_info, 0, m_primitives.size(), &total_nodes, ordered_prims, "_");
     m_primitives.swap(ordered_prims);
 
+    m_prim_index_map = std::unordered_map<std::pair<std::string, ScalarIndex>, ScalarIndex, HashPair>();
+    for (ScalarIndex i = 0; i < m_primitives.size(); i++) {
+        m_prim_index_map.insert({std::pair(m_primitives[i]->emitter->id(), m_primitives[i]->face_id), i});
+    }
+
     m_nodes = new LinearBVHNode[total_nodes]; // TODO: Allocate memory differently?
     m_total_nodes = total_nodes;
 
@@ -181,9 +186,11 @@ MTS_VARIANT Float BVH<Float, Spectrum>::pdf_tree(const SurfaceInteraction3f &si,
     Float pdf = 1.0;
 
     //TODO: Change this. HashMap like data structure. Unordered Map
-    typename std::vector<BVHPrimitive*>::iterator it = std::find_if(m_primitives.begin(), m_primitives.end(),
-                                                                    [emitter, face_idx](BVHPrimitive* p) {return p->emitter == emitter && p->face_id == face_idx; });
-    BVHPrimitive* prim = *it;
+//    typename std::vector<BVHPrimitive*>::iterator it = std::find_if(m_primitives.begin(), m_primitives.end(),
+//                                                                    [emitter, face_idx](BVHPrimitive* p) {return p->emitter == emitter && p->face_id == face_idx; });
+//    BVHPrimitive* prim = *it;
+    ScalarIndex prim_idx = m_prim_index_map[std::pair(emitter->id(), face_idx)];
+    BVHPrimitive* prim = m_primitives[prim_idx];
 
     int prev_offset;
     int current_offset = prim->leaf_offset;
