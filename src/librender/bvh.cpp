@@ -9,7 +9,7 @@ MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int ma
     m_primitives = std::vector<BVHPrimitive*>();
     for (size_t i = 0; i < p.size(); i++) {
         Shape *shape = p[i].get()->shape();
-        if (shape->is_mesh()) {
+        if (shape && shape->is_mesh()) {
             Mesh *mesh = static_cast<Mesh*>(shape);
             for (ScalarIndex j = 0; j < mesh->face_count(); j++) {
                 if (mesh->face_area(j) > 0) { // Don't add degenerate triangle with surface area of 0
