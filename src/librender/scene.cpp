@@ -119,6 +119,8 @@ MTS_VARIANT Scene<Float, Spectrum>::~Scene() {
         accel_release_gpu();
     else
         accel_release_cpu();
+
+    delete(m_bvh);
 }
 
 MTS_VARIANT typename Scene<Float, Spectrum>::SurfaceInteraction3f
