@@ -212,27 +212,7 @@ private:
                     ScalarBoundingBox3f &centroid_bbox, ScalarBoundingBox3f &node_bbox, ScalarCone3f &node_cone,
                     int nb_buckets, int &split_dim, int &split_bucket, Float &min_cost);
 
-    MTS_INLINE float compute_cone_weight(const LinearBVHNode &node, const SurfaceInteraction3f &si){
-        ScalarVector3f p_to_box_center = node.bbox.center() - si.p;
-
-        float in_angle = acos(dot(normalize(p_to_box_center), si.n));
-
-        float bangle = node.bbox.solid_angle(si.p);
-
-        float min_in_angle = max(in_angle - bangle, 0);
-
-        float caxis_p_angle = acos(dot(normalize(node.bcone.axis), normalize(-p_to_box_center)));
-
-        float min_e_angle = max(caxis_p_angle - node.bcone.normal_angle - bangle, 0);
-
-        float cone_weight = 0;
-
-        if (min_e_angle < node.bcone.emission_angle) {
-            cone_weight = abs(cos(min_in_angle)) * cos(min_e_angle);
-        }
-
-        return cone_weight;
-    }
+    Float compute_cone_weight(const LinearBVHNode &node, const SurfaceInteraction3f &si);
 
     BVHNode* create_leaf(std::vector<BVHPrimInfo> &primitive_info,
                          int start,
@@ -242,7 +222,7 @@ private:
                          Spectrum intensity = 0.f,
                          ScalarCone3f cone = ScalarCone3f());
 
-    static inline float compute_luminance(Spectrum intensity) {
+    static MTS_INLINE float compute_luminance(Spectrum intensity) {
         return hmean(intensity);
     }
 
@@ -272,7 +252,9 @@ private:
     std::unordered_map<std::pair<std::string, ScalarIndex>, ScalarIndex, HashPair> m_prim_index_map;
     LinearBVHNode *m_nodes = nullptr;
     int m_total_nodes;
+    int m_leaf_count;
     bool m_visualize_volumes;
+    std::vector<int> m_emitter_stats;
 };
 
 NAMESPACE_END(mitsuba)

@@ -248,6 +248,29 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
     return std::pair(l_weight / left_d, r_weight / right_d);
 }
 
+MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const LinearBVHNode &node, const SurfaceInteraction3f &si){
+    ScalarVector3f p_to_box_center = normalize(node.bbox.center() - si.p);
+
+    Float in_angle = acos(dot(p_to_box_center, si.n));
+
+    Float bangle = node.bbox.solid_angle(si.p);
+
+    Float min_in_angle = max(in_angle - bangle, 0);
+
+    Float caxis_p_angle = acos(dot(node.bcone.axis, -p_to_box_center));
+
+    Float min_e_angle = max(caxis_p_angle - node.bcone.normal_angle - bangle, 0);
+
+    Float cone_weight = 0;
+
+    if (min_e_angle < node.bcone.emission_angle) {
+//        cone_weight = abs(cos(min_in_angle)) * cos(min_e_angle); THIS WAS INCORRECT
+        cone_weight = max(cos(min_in_angle), 0) * cos(min_e_angle);
+    }
+
+    return cone_weight;
+}
+
 MTS_VARIANT typename BVH<Float,Spectrum>::BVHNode*
 BVH<Float,Spectrum>::recursive_build(std::vector<BVHPrimInfo> &primitive_info,
                                      int start,
