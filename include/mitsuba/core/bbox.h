@@ -266,21 +266,39 @@ template <typename Point_> struct BoundingBox {
     }
 
     //TODO: CHECK THIS
+//    Scalar solid_angle(const Point &p) const {
+//        Scalar max_angle = 0;
+
+//        if (this->contains(p)) {
+//            return 2 * M_PI;
+//        }
+
+//        Vector p_center = normalize(this->center() - p);
+
+//        for (size_t i = 0; i < 8; i++) {
+//            Vector p_corner = normalize(this->corner(i) - p);
+//            max_angle = enoki::max(max_angle, acos(dot(p_center, p_corner)));
+//        }
+
+//        return max_angle;
+//    }
+
     Scalar solid_angle(const Point &p) const {
-        Scalar max_angle = 0;
+        Scalar min_dot = 1;
 
         if (this->contains(p)) {
             return 2 * M_PI;
         }
 
+        Vector p_center = normalize(this->center() - p);
+
         for (size_t i = 0; i < 8; i++) {
-            Point corner = this->corner(i);
-            Vector p_center = this->center() - p;
-            Vector p_corner = corner - p;
-            max_angle = enoki::max(max_angle, acos(dot(normalize(p_center), normalize(p_corner))));
+            Vector p_corner = normalize(this->corner(i) - p);
+            min_dot = enoki::min(min_dot, dot(p_center, p_corner));
         }
 
-        return max_angle;
+        // Returns maximum angle
+        return acos(min_dot);
     }
 
     /**
