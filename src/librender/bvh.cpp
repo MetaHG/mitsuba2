@@ -6,6 +6,7 @@ NAMESPACE_BEGIN(mitsuba)
 MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int max_prims_in_node, SplitMethod split_method, bool visualize_volumes):
     m_max_prims_in_node(std::min(255, max_prims_in_node)), m_split_method(split_method), m_visualize_volumes(visualize_volumes) {
 
+    m_emitter_stats = std::vector<int>();
     m_primitives = std::vector<BVHPrimitive*>();
     for (size_t i = 0; i < p.size(); i++) {
         Shape *shape = p[i].get()->shape();
@@ -14,6 +15,9 @@ MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int ma
             for (ScalarIndex j = 0; j < mesh->face_count(); j++) {
                 if (mesh->face_area(j) > 0) { // Don't add degenerate triangle with surface area of 0
                     m_primitives.push_back(new BVHPrimitive(p[i], j, mesh->face_bbox(j), mesh->face_cone(j)));
+                    m_emitter_stats.push_back(0);
+                } else {
+//                    std::cout << "Face area is zero: skip face " << j << std::endl;
                 }
             }
         } else {
@@ -49,7 +53,7 @@ MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int ma
         }
 //            prim_info[i] = {i, m_primitives[i]->bbox() };
     }
-
+    m_leaf_count = 0;
     int total_nodes = 0;
     std::vector<BVHPrimitive*> ordered_prims;
     BVHNode *root;
@@ -67,9 +71,23 @@ MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int ma
 
     int offset = 0;
     flatten_bvh_tree(root, &offset, -1);
+
+    std::cout << "Prim count: " << m_primitives.size() << ", Leaf count: " << m_leaf_count << ", Total nodes: " << m_total_nodes << std::endl;
 }
 
 MTS_VARIANT BVH<Float, Spectrum>::~BVH() {
+//    for (int count : m_emitter_stats) {
+//        std::cout << count << ", ";
+//    }
+//    std::cout << std::endl;
+
+    auto b = m_emitter_stats.begin();
+    auto e = m_emitter_stats.end();
+    auto q = m_emitter_stats.begin();
+    std::advance(q, (int) (0.5 * m_emitter_stats.size()));
+    std::nth_element(b, q, e);
+    std::cout << "QUANTILE: " << *q << std::endl;
+
     delete m_nodes;
 }
 
@@ -78,6 +96,8 @@ BVH<Float,Spectrum>::sample_emitter(const Float &tree_sample, const SurfaceInter
     float pdf = 1.0f;
 
     BVHPrimitive *prim = sample_tree(ref, pdf, tree_sample);
+//    BVHPrimitive *prim = m_primitives[(int) tree_sample * m_primitives.size()];
+//    pdf /= m_primitives.size();
 
     DirectionSample3f ds;
     Spectrum spec;
@@ -107,6 +127,44 @@ MTS_VARIANT Float BVH<Float, Spectrum>::pdf_emitter_direction(const SurfaceInter
     }
 
     return emitter_pdf * pdf_tree(ref, emitter, face_idx);
+}
+
+MTS_VARIANT std::pair<typename BVH<Float, Spectrum>::DirectionSample3f, Spectrum>
+BVH<Float,Spectrum>::sample_emitter_pure(const Float &tree_sample, const SurfaceInteraction3f &ref, const Point2f &emitter_sample, const Mask active) {
+    float pdf = 1.0f;
+
+    BVHPrimitive *prim = sample_tree(ref, pdf, tree_sample);
+
+    DirectionSample3f ds;
+    Spectrum spec;
+    std::tie(ds, spec) = prim->sample_direction(ref, emitter_sample, active);
+
+    ds.pdf *= pdf;
+    ds.pdf = 1.0f;
+
+    return std::pair(ds, prim->get_total_radiance());
+}
+
+MTS_VARIANT Float BVH<Float, Spectrum>::pdf_emitter_direction_pure(const SurfaceInteraction3f &ref,
+                            const DirectionSample3f &ds,
+                            Mask active) {
+    const Emitter *emitter = reinterpret_array<EmitterPtr>(ds.object);
+    const Shape *shape = emitter->shape();
+
+    ScalarIndex face_idx = ds.prim_index;
+
+    Float emitter_pdf = 1.0f;
+    if (shape->is_mesh()) {
+        const Mesh *mesh = static_cast<const Mesh*>(shape);
+        if (mesh->face_area(face_idx) == 0) { // Handle degenerate triangles
+            return 0;
+        }
+        emitter_pdf = emitter->pdf_face_direction(face_idx, ref, ds, active);
+    } else {
+        emitter_pdf = emitter->pdf_direction(ref, ds, active);
+    }
+
+    return 1.0f; //emitter_pdf * pdf_tree(ref, emitter, face_idx);
 }
 
 MTS_VARIANT void BVH<Float, Spectrum>::to_obj() {
@@ -179,6 +237,7 @@ BVH<Float, Spectrum>::sample_tree(const SurfaceInteraction3f &si, float &importa
     prim_offset += leaf_offset;
     importance_ratio /= leaf_prim_count;
 
+    m_emitter_stats[prim_offset] += 1;
     return m_primitives[prim_offset];
 }
 
@@ -514,7 +573,7 @@ BVH<Float, Spectrum>::create_leaf(std::vector<BVHPrimInfo> &primitive_info,
     }
 
     leaf->init_leaf(first_prim_offset, nb_prim, prims_bbox, intensity, cone);
-
+    m_leaf_count++;
     return leaf;
 }
 

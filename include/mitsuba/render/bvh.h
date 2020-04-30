@@ -32,6 +32,12 @@ public:
                                 const DirectionSample3f &ds,
                                 Mask active);
 
+    std::pair<DirectionSample3f, Spectrum> sample_emitter_pure(const Float &tree_sample, const SurfaceInteraction3f &ref, const Point2f &emitter_sample, const Mask active);
+
+    Float pdf_emitter_direction_pure(const SurfaceInteraction3f &ref,
+                                const DirectionSample3f &ds,
+                                Mask active);
+
     void to_obj();
 
     MTS_DECLARE_CLASS()

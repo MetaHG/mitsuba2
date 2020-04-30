@@ -106,6 +106,12 @@ public:
                              bool test_visibility = true,
                              Mask active = true) const;
 
+    std::pair<DirectionSample3f, Spectrum>
+    sample_emitter_direction_pure(const SurfaceInteraction3f &ref,
+                             const Point3f &sample,
+                             bool test_visibility = true,
+                             Mask active = true) const;
+
     /**
      * \brief Evaluate the probability density of the  \ref
      * sample_emitter_direct() technique given an filled-in \ref
@@ -125,6 +131,10 @@ public:
                                 Mask active = true) const;
 
     Float pdf_emitter_direction_custom(const SurfaceInteraction3f &ref,
+                                const DirectionSample3f &ds,
+                                Mask active = true) const;
+
+    Float pdf_emitter_direction_pure(const SurfaceInteraction3f &ref,
                                 const DirectionSample3f &ds,
                                 Mask active = true) const;
 
