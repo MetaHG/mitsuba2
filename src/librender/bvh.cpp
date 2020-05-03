@@ -142,7 +142,7 @@ BVH<Float,Spectrum>::sample_emitter_pure(const Float &tree_sample, const Surface
     ds.pdf *= pdf;
     ds.pdf = 1.0f;
 
-    return std::pair(ds, prim->get_total_radiance());
+    return std::pair(ds, prim->emitter->get_radiance());
 }
 
 MTS_VARIANT Float BVH<Float, Spectrum>::pdf_emitter_direction_pure(const SurfaceInteraction3f &ref,
