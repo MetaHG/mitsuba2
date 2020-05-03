@@ -199,12 +199,6 @@ Scene<Float, Spectrum>::sample_emitter_direction_pure(const SurfaceInteraction3f
 
 //        std::cout << "Spectrum: " << spec << std::endl;
 
-        // Perform a visibility test if requested
-        if (test_visibility && any_or<true>(active)) {
-            Ray3f ray(ref.p, ds.d, math::RayEpsilon<Float> * (1.f + hmax(abs(ref.p))),
-                      ds.dist * (1.f - math::ShadowEpsilon<Float>), ref.time, ref.wavelengths);
-            spec[ray_test(ray, active)] = 0.f;
-        }
     } else {
         ds = zero<DirectionSample3f>();
         spec = 0.f;
