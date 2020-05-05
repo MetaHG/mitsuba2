@@ -65,7 +65,7 @@ template <typename Float_, typename Point_> struct Cone {
         Vector rotation_axis = cross(c1.axis, c2.axis);
 
         Vector new_axis;
-        if (all(rotation_axis < std::numeric_limits<float>::epsilon())) {
+        if (all(abs(rotation_axis) < std::numeric_limits<float>::epsilon())) {
             // Cone vectors were anti-parallel. Pick a random vector in the disk perpendicular to the vectors as rotation axis
             Vector a, b;
             std::tie(a, b) = coordinate_system(c1.axis);
