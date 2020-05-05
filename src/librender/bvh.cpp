@@ -295,14 +295,21 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
     l_weight *= compute_luminance(ln.intensity);
     r_weight *= compute_luminance(rn.intensity);
 
-    Float left_d = ln.bbox.squared_distance(ref.p);
-    Float right_d = rn.bbox.squared_distance(ref.p);
+//    Log(Info, "Intensity L weight: %s, Intensity R weight: %s\n", l_weight, r_weight);
 
-    Float distance_ratio = 1.0f; //TODO: DEFINE IT
-    if (left_d <= distance_ratio * squared_norm(ln.bbox.extents())
-        || right_d <= distance_ratio * squared_norm(rn.bbox.extents())) {
-        return std::pair(l_weight, r_weight);
-    }
+//    Float left_d = ln.bbox.squared_distance(ref.p);
+//    Float right_d = rn.bbox.squared_distance(ref.p);
+
+//    Float distance_ratio = 1.0f; //TODO: DEFINE IT
+//    if (left_d <= distance_ratio * squared_norm(ln.bbox.extents())
+//        || right_d <= distance_ratio * squared_norm(rn.bbox.extents())) {
+//        return std::pair(l_weight, r_weight);
+//    }
+
+    Float left_d = max(squared_norm(ln.bbox.extents()) / 4.0f, squared_norm(ln.bbox.center() - ref.p));
+    Float right_d = max(squared_norm(rn.bbox.extents()) / 4.0f, squared_norm(rn.bbox.center() - ref.p));
+
+//    Log(Info, "Left distance %s, right distance: %s", left_d, right_d);
 
     return std::pair(l_weight / left_d, r_weight / right_d);
 }
