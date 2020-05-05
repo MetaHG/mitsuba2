@@ -641,7 +641,7 @@ MTS_VARIANT void BVH<Float, Spectrum>::cone_to_obj(std::string filename, ScalarP
         a = b * cone_scale_factor;
     }
 
-    if (cone.normal_angle == 0) {
+    if (cone.normal_angle < std::numeric_limits<Float>::epsilon()) {
         ofs << obj_vertex(circle_center);
         ofs << "l 1 2" << std::endl;
         return;
