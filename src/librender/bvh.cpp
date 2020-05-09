@@ -3,8 +3,12 @@
 
 NAMESPACE_BEGIN(mitsuba)
 
+#define CONE_SCALE_FACTOR 0.5
+
 MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int max_prims_in_node, SplitMethod split_method, bool visualize_volumes):
     m_max_prims_in_node(std::min(255, max_prims_in_node)), m_split_method(split_method), m_visualize_volumes(visualize_volumes) {
+
+    Log(Info, "BVH Light Hierarchy: Building..");
 
     m_emitter_stats = std::vector<int>();
     m_primitives = std::vector<BVHPrimitive*>();
@@ -12,32 +16,34 @@ MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int ma
         Shape *shape = p[i].get()->shape();
         if (shape && shape->is_mesh()) {
             Mesh *mesh = static_cast<Mesh*>(shape);
+            ScalarIndex skipped_face_count = 0;
             for (ScalarIndex j = 0; j < mesh->face_count(); j++) {
                 if (mesh->face_area(j) > 0) { // Don't add degenerate triangle with surface area of 0
                     m_primitives.push_back(new BVHPrimitive(p[i], j, mesh->face_bbox(j), mesh->face_cone(j)));
                     m_emitter_stats.push_back(0);
                 } else {
-//                    std::cout << "Face area is zero: skip face " << j << std::endl;
+                    skipped_face_count += 1;
                 }
             }
+
+            if (skipped_face_count > 0) {
+                Log(Warn, "BVH Light Hierarchy: Skipped %s faces (area is zero) of mesh with id %s", skipped_face_count, mesh->id());
+            }
+
+//            TODO: ADD POSSIBILITY TO NOT SPLIT MESHES
+//            m_emitter_stats.push_back(0);
+//            m_primitives.push_back(new BVHPrimitive(p[i], 0, p[i]->bbox(), ScalarCone3f(ScalarVector3f(1.0, 0.0, 0.0), M_PIf32, M_PIf32))); // Cone would need to be computed by going through triangles probably.
         } else {
             m_primitives.push_back(new BVHPrimitive(p[i]));
         }
     }
-
-//        Spectrum total_radiance(0.0f);
-//        for (BVHPrimitive* b: m_primitives) {
-//            std::cout << b->get_total_radiance() << std::endl;
-//            total_radiance += b->get_total_radiance();
-//        }
-
-//        std::cout << "Total radiance: " << total_radiance << std::endl;
 
 
     if (m_primitives.size() == 0) {
         return;
     }
 
+    // TODO: Refactor this part ?
     // std::vector<BVHPrimInfo> prim_info(m_primitives.size());
     std::vector<BVHPrimInfo> prim_info;
     for (size_t i = 0; i < m_primitives.size(); i++) {
@@ -53,6 +59,7 @@ MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int ma
         }
 //            prim_info[i] = {i, m_primitives[i]->bbox() };
     }
+
     m_leaf_count = 0;
     int total_nodes = 0;
     std::vector<BVHPrimitive*> ordered_prims;
@@ -66,21 +73,21 @@ MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int ma
         m_prim_index_map.insert({std::pair(m_primitives[i]->emitter->id(), m_primitives[i]->face_id), i});
     }
 
-    m_nodes = new LinearBVHNode[total_nodes]; // TODO: Allocate memory differently?
+    m_nodes = new LinearBVHNode[total_nodes];
     m_total_nodes = total_nodes;
 
     int offset = 0;
     flatten_bvh_tree(root, &offset, -1);
 
-    std::cout << "Prim count: " << m_primitives.size() << ", Leaf count: " << m_leaf_count << ", Total nodes: " << m_total_nodes << std::endl;
+    Log(Info, "BVH Light Hierarchy: Build finished.");
+    Log(Info, "BVH Light Hierarchy statistics:\n"
+              "  Primitive count: %s,\n"
+              "  Leaf count: %s,\n"
+              "  Total nodes: %s", m_primitives.size(), m_leaf_count, m_total_nodes);
 }
 
 MTS_VARIANT BVH<Float, Spectrum>::~BVH() {
-//    for (int count : m_emitter_stats) {
-//        std::cout << count << ", ";
-//    }
-//    std::cout << std::endl;
-
+    // TODO: Clean this
     auto b = m_emitter_stats.begin();
     auto e = m_emitter_stats.end();
     auto q = m_emitter_stats.begin();
@@ -96,12 +103,10 @@ BVH<Float,Spectrum>::sample_emitter(const Float &tree_sample, const SurfaceInter
     float pdf = 1.0f;
 
     BVHPrimitive *prim = sample_tree(ref, pdf, tree_sample);
-//    BVHPrimitive *prim = m_primitives[(int) tree_sample * m_primitives.size()];
-//    pdf /= m_primitives.size();
 
     DirectionSample3f ds;
     Spectrum spec;
-    std::tie(ds, spec) = prim->sample_direction(ref, emitter_sample, active); // TODO: ds.pdf is sometimes INF
+    std::tie(ds, spec) = prim->sample_direction(ref, emitter_sample, active);
 
     ds.pdf *= pdf;
     return std::pair(ds, spec / pdf);
@@ -129,6 +134,7 @@ MTS_VARIANT Float BVH<Float, Spectrum>::pdf_emitter_direction(const SurfaceInter
     return emitter_pdf * pdf_tree(ref, emitter, face_idx);
 }
 
+// TODO: REFACTOR THIS
 MTS_VARIANT std::pair<typename BVH<Float, Spectrum>::DirectionSample3f, Spectrum>
 BVH<Float,Spectrum>::sample_emitter_pure(const Float &tree_sample, const SurfaceInteraction3f &ref, const Point2f &emitter_sample, const Mask active) {
     float pdf = 1.0f;
@@ -145,6 +151,7 @@ BVH<Float,Spectrum>::sample_emitter_pure(const Float &tree_sample, const Surface
     return std::pair(ds, prim->emitter->get_radiance());
 }
 
+// TODO: REFACTOR THIS
 MTS_VARIANT Float BVH<Float, Spectrum>::pdf_emitter_direction_pure(const SurfaceInteraction3f &ref,
                             const DirectionSample3f &ds,
                             Mask active) {
@@ -167,6 +174,7 @@ MTS_VARIANT Float BVH<Float, Spectrum>::pdf_emitter_direction_pure(const Surface
     return 1.0f; //emitter_pdf * pdf_tree(ref, emitter, face_idx);
 }
 
+// TODO: Refactor this
 MTS_VARIANT void BVH<Float, Spectrum>::to_obj() {
     std::string dir_name = "lighttree_bboxes";
 
@@ -205,6 +213,7 @@ BVH<Float, Spectrum>::sample_tree(const SurfaceInteraction3f &si, float &importa
     Float sample(sample_);
 
     int offset = 0;
+
     while (!m_nodes[offset].is_leaf()) {
         float w_left, w_right;
         std::tie(w_left, w_right) = compute_children_weights(offset, si);
@@ -226,6 +235,7 @@ BVH<Float, Spectrum>::sample_tree(const SurfaceInteraction3f &si, float &importa
         }
     }
 
+    // TODO: BUILD DISTRIBUTION FUNCTION TO SAMPLE BETTER THE LEAVES
     int leaf_offset = m_nodes[offset].primitives_offset;
     int leaf_prim_count = m_nodes[offset].prim_count;
 
@@ -244,10 +254,6 @@ BVH<Float, Spectrum>::sample_tree(const SurfaceInteraction3f &si, float &importa
 MTS_VARIANT Float BVH<Float, Spectrum>::pdf_tree(const SurfaceInteraction3f &si, const Emitter *emitter, const ScalarIndex face_idx) {
     Float pdf = 1.0;
 
-    //TODO: Change this. HashMap like data structure. Unordered Map
-//    typename std::vector<BVHPrimitive*>::iterator it = std::find_if(m_primitives.begin(), m_primitives.end(),
-//                                                                    [emitter, face_idx](BVHPrimitive* p) {return p->emitter == emitter && p->face_id == face_idx; });
-//    BVHPrimitive* prim = *it;
     ScalarIndex prim_idx = m_prim_index_map[std::pair(emitter->id(), face_idx)];
     BVHPrimitive* prim = m_primitives[prim_idx];
 
@@ -285,6 +291,7 @@ MTS_VARIANT Float BVH<Float, Spectrum>::pdf_tree(const SurfaceInteraction3f &si,
     return pdf;
 }
 
+// TODO: ADD ENUM TO CHOOSE FROM MULTIPLE POSSIBLE IMPORTANCE METHODS
 MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weights(int offset, const SurfaceInteraction3f &ref) {
     const LinearBVHNode &ln = m_nodes[offset + 1];
     const LinearBVHNode &rn = m_nodes[m_nodes[offset].second_child_offset];
@@ -294,8 +301,6 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
 
     l_weight *= compute_luminance(ln.intensity);
     r_weight *= compute_luminance(rn.intensity);
-
-//    Log(Info, "Intensity L weight: %s, Intensity R weight: %s\n", l_weight, r_weight);
 
 //    Float left_d = ln.bbox.squared_distance(ref.p);
 //    Float right_d = rn.bbox.squared_distance(ref.p);
@@ -309,13 +314,16 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
     Float left_d = max(squared_norm(ln.bbox.extents()) / 4.0f, squared_norm(ln.bbox.center() - ref.p));
     Float right_d = max(squared_norm(rn.bbox.extents()) / 4.0f, squared_norm(rn.bbox.center() - ref.p));
 
-//    Log(Info, "Left distance %s, right distance: %s", left_d, right_d);
-
     return std::pair(l_weight / left_d, r_weight / right_d);
 }
 
 MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const LinearBVHNode &node, const SurfaceInteraction3f &si){
     ScalarVector3f p_to_box_center = normalize(node.bbox.center() - si.p);
+
+//  MATH_PI
+//    if (!node.bbox.contains(si.p) && node.bcone.normal_angle + node.bcone.emission_angle <= M_PI_2f32 && dot(node.bcone.axis, -p_to_box_center) < 0) {
+//        return 0;
+//    }
 
     Float in_angle = acos(dot(p_to_box_center, si.n));
 
@@ -328,15 +336,15 @@ MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const Line
     Float min_e_angle = max(caxis_p_angle - node.bcone.normal_angle - bangle, 0);
 
     Float cone_weight = 0;
-
     if (min_e_angle < node.bcone.emission_angle) {
-//        cone_weight = abs(cos(min_in_angle)) * cos(min_e_angle); THIS WAS INCORRECT
         cone_weight = max(cos(min_in_angle), 0) * cos(min_e_angle);
     }
 
     return cone_weight;
 }
 
+
+// MAYBE REFACTOR THIS WITH SMALLER METHODS
 MTS_VARIANT typename BVH<Float,Spectrum>::BVHNode*
 BVH<Float,Spectrum>::recursive_build(std::vector<BVHPrimInfo> &primitive_info,
                                      int start,
@@ -532,6 +540,7 @@ MTS_VARIANT void BVH<Float, Spectrum>::find_split(std::vector<BVHPrimInfo> &prim
                 }
             }
 
+            // TODO: CLEAN THIS METHOD
             if (m_split_method == SplitMethod::SAOH) {
                 if (node_bbox.surface_area() < std::numeric_limits<float>::epsilon()) {
                     //cost[i] = squared_norm(node_bbox.extents()) * (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
@@ -614,6 +623,7 @@ MTS_VARIANT void BVH<Float, Spectrum>::save_to_obj(std::string node_name, Scalar
 
     std::ostringstream oss_cone;
     oss_cone << dir_name << "/cone" << node_name << ".obj";
+
     cone_to_obj(oss_cone.str(), bbox.center(), cone);
 }
 
@@ -621,6 +631,7 @@ MTS_VARIANT void BVH<Float, Spectrum>::cone_to_obj(std::string filename, ScalarP
     std::ofstream ofs(filename, std::ofstream::out);
 
     ofs << "# Vertices" << std::endl;
+
     // Center
     ofs << obj_vertex(center);
 
@@ -630,7 +641,7 @@ MTS_VARIANT void BVH<Float, Spectrum>::cone_to_obj(std::string filename, ScalarP
     Point circle_center = center;
     Float scale_factor = tan(cone.normal_angle);
 
-    float cone_scale_factor = 0.5f; // TODO: DEFINE
+    float cone_scale_factor = CONE_SCALE_FACTOR;
     if (cone.normal_angle < M_PI_2f32 - std::numeric_limits<float>::epsilon()) {
         float cos_scale_factor = cos(cone.normal_angle) * cone_scale_factor;
         a *= scale_factor * cos_scale_factor;
