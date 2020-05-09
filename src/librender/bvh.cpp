@@ -5,10 +5,12 @@ NAMESPACE_BEGIN(mitsuba)
 
 #define CONE_SCALE_FACTOR 0.5
 
-MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int max_prims_in_node, SplitMethod split_method, bool visualize_volumes):
-    m_max_prims_in_node(std::min(255, max_prims_in_node)), m_split_method(split_method), m_visualize_volumes(visualize_volumes) {
+MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int max_prims_in_node,
+                                      SplitMethod split_method, ClusterImportanceMethod cluster_importance_method, bool visualize_volumes):
+    m_max_prims_in_node(std::min(255, max_prims_in_node)), m_split_method(split_method),
+    m_cluster_importance_method(cluster_importance_method), m_visualize_volumes(visualize_volumes) {
 
-    Log(Info, "BVH Light Hierarchy: Building..");
+    Log(Info, "Building a SAOH BVH Light Hierarchy");
 
     m_emitter_stats = std::vector<int>();
     m_primitives = std::vector<BVHPrimitive*>();
@@ -79,7 +81,7 @@ MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int ma
     int offset = 0;
     flatten_bvh_tree(root, &offset, -1);
 
-    Log(Info, "BVH Light Hierarchy: Build finished.");
+    Log(Info, "Finished.");
     Log(Info, "BVH Light Hierarchy statistics:\n"
               "  Primitive count: %s,\n"
               "  Leaf count: %s,\n"
@@ -296,23 +298,43 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
     const LinearBVHNode &ln = m_nodes[offset + 1];
     const LinearBVHNode &rn = m_nodes[m_nodes[offset].second_child_offset];
 
-    Float l_weight = compute_cone_weight(ln, ref);
-    Float r_weight = compute_cone_weight(rn, ref);
+    Float l_weight = compute_luminance(ln.intensity);
+    Float r_weight = compute_luminance(rn.intensity);
 
-    l_weight *= compute_luminance(ln.intensity);
-    r_weight *= compute_luminance(rn.intensity);
+    Float left_d = 1.0f;
+    Float right_d = 1.0f;
 
-//    Float left_d = ln.bbox.squared_distance(ref.p);
-//    Float right_d = rn.bbox.squared_distance(ref.p);
+    switch (m_cluster_importance_method) {
+        case ClusterImportanceMethod::ORIENTATION_STOCHASTIC_YUKSEL_PAPER: {
+            l_weight *= compute_cone_weight(ln, ref);
+            r_weight *= compute_cone_weight(rn, ref);
+        }
 
-//    Float distance_ratio = 1.0f; //TODO: DEFINE IT
-//    if (left_d <= distance_ratio * squared_norm(ln.bbox.extents())
-//        || right_d <= distance_ratio * squared_norm(rn.bbox.extents())) {
-//        return std::pair(l_weight, r_weight);
-//    }
+        case ClusterImportanceMethod::BASE_STOCHASTIC_YUKSEL_PAPER: {
+            left_d *= ln.bbox.squared_distance(ref.p);
+            right_d *= rn.bbox.squared_distance(ref.p);
 
-    Float left_d = max(squared_norm(ln.bbox.extents()) / 4.0f, squared_norm(ln.bbox.center() - ref.p));
-    Float right_d = max(squared_norm(rn.bbox.extents()) / 4.0f, squared_norm(rn.bbox.center() - ref.p));
+            Float distance_ratio = 1.0f; //TODO: DEFINE IT
+            if (left_d <= distance_ratio * squared_norm(ln.bbox.extents())
+                || right_d <= distance_ratio * squared_norm(rn.bbox.extents())) {
+                return std::pair(l_weight, r_weight);
+            }
+        }
+        break;
+
+        case ClusterImportanceMethod::ORIENTATION_ESTEVEZ_PAPER:
+        default: {
+            l_weight *= compute_cone_weight(ln, ref);
+            r_weight *= compute_cone_weight(rn, ref);
+        }
+
+        case ClusterImportanceMethod::BASE_ESTEVEZ_PAPER: {
+            left_d = max(squared_norm(ln.bbox.extents()) / 4.0f, squared_norm(ln.bbox.center() - ref.p));
+            right_d = max(squared_norm(rn.bbox.extents()) / 4.0f, squared_norm(rn.bbox.center() - ref.p));
+        }
+        break;
+
+    }
 
     return std::pair(l_weight / left_d, r_weight / right_d);
 }

@@ -13,6 +13,7 @@
 NAMESPACE_BEGIN(mitsuba)
 
 enum class SplitMethod { SAH, SAOH, Middle, EqualCounts };
+enum class ClusterImportanceMethod { BASE_ESTEVEZ_PAPER, ORIENTATION_ESTEVEZ_PAPER, BASE_STOCHASTIC_YUKSEL_PAPER, ORIENTATION_STOCHASTIC_YUKSEL_PAPER };
 
 MTS_VARIANT class MTS_EXPORT_RENDER BVH : public Object {
 public:
@@ -22,17 +23,20 @@ public:
     using ScalarIndex = uint32_t; // TODO: See how to import this from shape
     using EmitterPtr = replace_scalar_t<Float, const Emitter *>;
 
-    BVH(host_vector<ref<Emitter>, Float> p, int max_prims_in_node, SplitMethod split_method, bool visualize_volumes = false);
+    BVH(host_vector<ref<Emitter>, Float> p, int max_prims_in_node, SplitMethod split_method,
+        ClusterImportanceMethod cluster_importance_method, bool visualize_volumes = false);
 
     ~BVH();
 
-    std::pair<DirectionSample3f, Spectrum> sample_emitter(const Float &tree_sample, const SurfaceInteraction3f &ref, const Point2f &emitter_sample, const Mask active);
+    std::pair<DirectionSample3f, Spectrum> sample_emitter(const Float &tree_sample, const SurfaceInteraction3f &ref,
+                                                          const Point2f &emitter_sample, const Mask active);
 
     Float pdf_emitter_direction(const SurfaceInteraction3f &ref,
                                 const DirectionSample3f &ds,
                                 Mask active);
 
-    std::pair<DirectionSample3f, Spectrum> sample_emitter_pure(const Float &tree_sample, const SurfaceInteraction3f &ref, const Point2f &emitter_sample, const Mask active);
+    std::pair<DirectionSample3f, Spectrum> sample_emitter_pure(const Float &tree_sample, const SurfaceInteraction3f &ref,
+                                                               const Point2f &emitter_sample, const Mask active);
 
     Float pdf_emitter_direction_pure(const SurfaceInteraction3f &ref,
                                 const DirectionSample3f &ds,
@@ -80,6 +84,7 @@ protected:
         int split_axis;
         int first_prim_offset;
         int prim_count;
+
         // Emitter related fields
         Spectrum intensity;
         ScalarCone3f bcone;
@@ -156,7 +161,8 @@ protected:
             return emitter->get_total_radiance();
         }
 
-        inline std::pair<DirectionSample3f, Spectrum> sample_direction(const SurfaceInteraction3f &ref, const Point2f &emitter_sample, const Mask active) {
+        inline std::pair<DirectionSample3f, Spectrum> sample_direction(const SurfaceInteraction3f &ref,
+                                                                       const Point2f &emitter_sample, const Mask active) {
             if (is_triangle) {
                 return emitter->sample_face_direction(face_id, ref, emitter_sample, active);
             }
@@ -173,7 +179,6 @@ protected:
 protected:
     BVHPrimitive* sample_tree(const SurfaceInteraction3f &si, float &importance_ratio, const Float &sample_);
 
-    // face_idx could be the node index
     Float pdf_tree(const SurfaceInteraction3f &si, const Emitter *emitter, const ScalarIndex face_idx);
 
     std::pair<Float, Float> compute_children_weights(int offset, const SurfaceInteraction3f &ref);
@@ -254,6 +259,7 @@ private:
 private:
     const int m_max_prims_in_node;
     const SplitMethod m_split_method;
+    const ClusterImportanceMethod m_cluster_importance_method;
     std::vector<BVHPrimitive*> m_primitives;
     std::unordered_map<std::pair<std::string, ScalarIndex>, ScalarIndex, HashPair> m_prim_index_map;
     LinearBVHNode *m_nodes = nullptr;
