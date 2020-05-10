@@ -4,7 +4,6 @@
 #include <mitsuba/render/emitter.h>
 #include <mitsuba/render/fwd.h>
 #include <mitsuba/render/sensor.h>
-#include <mitsuba/render/lighttree.h>
 #include <mitsuba/render/bvh.h>
 
 NAMESPACE_BEGIN(mitsuba)
@@ -223,7 +222,6 @@ protected:
     ref<Integrator> m_integrator;
     ref<Emitter> m_environment;
 
-    LightTree<Float, Spectrum, ScalarBoundingBox3f> *m_lighttree;
     BVH<Float, Spectrum> *m_bvh;
 };
 
