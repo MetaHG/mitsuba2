@@ -329,8 +329,8 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
         }
 
         case ClusterImportanceMethod::BASE_ESTEVEZ_PAPER: {
-            left_d = max(squared_norm(ln.bbox.extents()) / 4.0f, squared_norm(ln.bbox.center() - ref.p));
-            right_d = max(squared_norm(rn.bbox.extents()) / 4.0f, squared_norm(rn.bbox.center() - ref.p));
+            left_d = max(max(squared_norm(ln.bbox.extents()) / 4.0f, std::numeric_limits<Float>::epsilon()), squared_norm(ln.bbox.center() - ref.p));
+            right_d = max(max(squared_norm(rn.bbox.extents()) / 4.0f, std::numeric_limits<Float>::epsilon()), squared_norm(rn.bbox.center() - ref.p));
         }
         break;
 
