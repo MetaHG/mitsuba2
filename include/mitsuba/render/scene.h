@@ -223,6 +223,7 @@ protected:
     ref<Emitter> m_environment;
 
     BVH<Float, Spectrum> *m_bvh;
+    mutable std::ofstream m_colors_stats_file;
 };
 
 /// Dummy function which can be called to ensure that the librender shared library is loaded

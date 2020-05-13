@@ -21,7 +21,9 @@
 NAMESPACE_BEGIN(mitsuba)
 
 // SIMPLE SWITCH TO GO BACK TO REF BUILD
-// #define REF
+//#define REF
+// ACTIVATE STATISTICS REGISTERING
+//#define STAT
 
 MTS_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props) {
     for (auto &kv : props.objects()) {
@@ -106,6 +108,10 @@ MTS_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props) {
 #if !defined(REF)
     m_bvh = new BVH<Float, Spectrum>(m_emitters, 1, SplitMethod::SAOH, ClusterImportanceMethod::ORIENTATION_ESTEVEZ_PAPER, false);
 #endif
+
+#if defined(STAT)
+    m_colors_stats_file = std::ofstream("colors_stats.csv", std::ofstream::out);
+#endif
 }
 
 MTS_VARIANT Scene<Float, Spectrum>::~Scene() {
@@ -114,7 +120,14 @@ MTS_VARIANT Scene<Float, Spectrum>::~Scene() {
     else
         accel_release_cpu();
 
+#if !defined(REF)
     delete(m_bvh);
+#endif
+
+#if defined(STAT)
+    m_colors_stats_file.close();
+#endif
+
 }
 
 MTS_VARIANT typename Scene<Float, Spectrum>::SurfaceInteraction3f
@@ -210,10 +223,15 @@ Scene<Float, Spectrum>::sample_emitter_direction_custom(const SurfaceInteraction
                       ds.dist * (1.f - math::ShadowEpsilon<Float>), ref.time, ref.wavelengths);
             spec[ray_test(ray, active)] = 0.f;
         }
+
     } else {
         ds = zero<DirectionSample3f>();
         spec = 0.f;
     }
+
+#if defined(STAT)
+    m_colors_stats_file << spec[0] << "," << spec[1] << "," << spec[2] << "," << spec[3] << std::endl;
+#endif
 
     return { ds, spec };
 }
@@ -275,10 +293,15 @@ Scene<Float, Spectrum>::sample_emitter_direction(const Interaction3f &ref, const
                       ds.dist * (1.f - math::ShadowEpsilon<Float>), ref.time, ref.wavelengths);
             spec[ray_test(ray, active)] = 0.f;
         }
+
     } else {
         ds = zero<DirectionSample3f>();
         spec = 0.f;
     }
+
+#if defined(STAT)
+    m_colors_stats_file << spec[0] << "," << spec[1] << "," << spec[2] << "," << spec[3] << std::endl;
+#endif
 
     return { ds, spec };
 }
