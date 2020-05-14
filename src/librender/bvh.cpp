@@ -101,7 +101,12 @@ MTS_VARIANT BVH<Float, Spectrum>::~BVH() {
     std::cout << "QUANTILE: " << *q << std::endl;
 
     std::cout << "TREE NODE: " << m_nodes->cone() << std::endl;
-    delete m_nodes;
+
+    for (BVHPrimitive* prim: m_primitives) {
+        delete prim;
+    }
+
+    delete[] m_nodes;
 }
 
 MTS_VARIANT std::pair<typename BVH<Float, Spectrum>::DirectionSample3f, Spectrum>

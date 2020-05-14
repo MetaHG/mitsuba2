@@ -98,6 +98,9 @@ protected:
     };
 
     struct LinearBVHNode : IBVHEmitter {
+        // Destructor
+        virtual ~LinearBVHNode() { }
+
         // Methods
         bool is_root() {
             return parent_offset < 0;
@@ -158,6 +161,10 @@ protected:
             prim_bbox = bbox;
             prim_cone = cone;
         }
+
+        // Destructor
+        virtual ~BVHPrimitive() { }
+
         //-----------------------------------------------
 
         // Methods
