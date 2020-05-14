@@ -90,7 +90,15 @@ protected:
         ScalarCone3f bcone;
     };
 
-    struct LinearBVHNode {
+    struct IBVHEmitter {
+        virtual ~IBVHEmitter() { }
+        virtual Spectrum intensity() const = 0;
+        virtual ScalarBoundingBox3f bbox() const = 0;
+        virtual ScalarCone3f cone() const = 0;
+    };
+
+    struct LinearBVHNode : IBVHEmitter {
+        // Methods
         bool is_root() {
             return parent_offset < 0;
         }
@@ -99,20 +107,46 @@ protected:
             return prim_count > 0;
         }
 
-        ScalarBoundingBox3f bbox;
+        inline Spectrum intensity() const override {
+            return node_intensity;
+        }
+
+        inline ScalarBoundingBox3f bbox() const override {
+            return node_bbox;
+        }
+
+        inline ScalarCone3f cone() const override {
+            return node_cone;
+        }
+        // --------------------------------------------------------
+
+        // Fields
+        ScalarBoundingBox3f node_bbox;
         union {
             int primitives_offset; // leaf
             int second_child_offset; // inner
         };
         uint16_t prim_count; // 0 -> inner node
         uint8_t axis;
-        Spectrum intensity;
-        ScalarCone3f bcone;
+        Spectrum node_intensity;
+        ScalarCone3f node_cone;
         int parent_offset;
         uint8_t pad[1]; // Padding for memory/cache alignment
     };
 
-    struct BVHPrimitive {
+    struct BVHPrimitive : IBVHEmitter {
+
+        // Constructors
+
+        BVHPrimitive() {
+            emitter = nullptr;
+            leaf_offset = 0;
+            is_triangle = false;
+            face_id = 0;
+            prim_bbox = ScalarBoundingBox3f();
+            prim_cone = ScalarCone3f();
+        }
+
         BVHPrimitive(Emitter *emitter) : emitter(emitter), leaf_offset(-1), is_triangle(false), face_id(0) {
             prim_bbox = ScalarBoundingBox3f();
             prim_cone = ScalarCone3f();
@@ -124,17 +158,10 @@ protected:
             prim_bbox = bbox;
             prim_cone = cone;
         }
+        //-----------------------------------------------
 
-        Emitter *emitter;
-        int leaf_offset;
-
-        bool is_triangle;
-        ScalarIndex face_id;
-        ScalarBoundingBox3f prim_bbox;
-        ScalarCone3f prim_cone;
-
-
-        inline ScalarBoundingBox3f bbox() {
+        // Methods
+        inline ScalarBoundingBox3f bbox() const override {
             if (is_triangle) {
                 return prim_bbox;
             }
@@ -142,7 +169,7 @@ protected:
             return emitter->bbox();
         }
 
-        inline ScalarCone3f cone() {
+        inline ScalarCone3f cone() const override {
             if (is_triangle) {
                 return prim_cone;
             }
@@ -150,7 +177,7 @@ protected:
             return emitter->cone();
         }
 
-        inline Spectrum get_total_radiance() {
+        inline Spectrum intensity() const override {
             if (is_triangle) {
                 const Shape *shape = emitter->shape();
                 const Mesh *mesh = static_cast<const Mesh*>(shape);
@@ -170,18 +197,41 @@ protected:
             return emitter->sample_direction(ref, emitter_sample, active);
         }
 
-        inline bool operator==(const BVHPrimitive &prim){
+        inline bool operator==(const BVHPrimitive &prim) {
             return emitter == prim.emitter &&
                    face_id == prim.face_id;
         }
+
+        inline void operator=(const BVHPrimitive &prim) {
+            emitter = prim.emitter;
+            leaf_offset = prim.leaf_offset;
+            is_triangle = prim.is_triangle;
+            face_id = prim.face_id;
+            prim_bbox = ScalarBoundingBox3f(prim.prim_bbox.min, prim.prim_bbox.max);
+            prim_cone = ScalarCone3f(prim.cone());
+        }
+
+        // --------------------------------------------------------------------------------
+        // Fields
+        Emitter *emitter;
+        int leaf_offset;
+
+        bool is_triangle;
+        ScalarIndex face_id;
+        ScalarBoundingBox3f prim_bbox;
+        ScalarCone3f prim_cone;
     };
 
 protected:
     BVHPrimitive* sample_tree(const SurfaceInteraction3f &si, float &importance_ratio, const Float &sample_);
 
+    BVHPrimitive* sample_leaf(const SurfaceInteraction3f &si, float &importance_ratio, const Float &sample_, const LinearBVHNode &leaf) const;
+
     Float pdf_tree(const SurfaceInteraction3f &si, const Emitter *emitter, const ScalarIndex face_idx);
 
     std::pair<Float, Float> compute_children_weights(int offset, const SurfaceInteraction3f &ref);
+
+    ScalarFloat* compute_bvh_emitters_weights(const std::vector<IBVHEmitter*> &emitters, size_t size, const SurfaceInteraction3f &ref) const;
 
     BVHNode* recursive_build(std::vector<BVHPrimInfo> &primitive_info,
                              int start,
@@ -223,7 +273,7 @@ private:
                     ScalarBoundingBox3f &centroid_bbox, ScalarBoundingBox3f &node_bbox, ScalarCone3f &node_cone,
                     int nb_buckets, int &split_dim, int &split_bucket, Float &min_cost);
 
-    Float compute_cone_weight(const LinearBVHNode &node, const SurfaceInteraction3f &si);
+    Float compute_cone_weight(const IBVHEmitter *node, const SurfaceInteraction3f &si) const;
 
     BVHNode* create_leaf(std::vector<BVHPrimInfo> &primitive_info,
                          int start,
@@ -233,7 +283,7 @@ private:
                          Spectrum intensity = 0.f,
                          ScalarCone3f cone = ScalarCone3f());
 
-    static MTS_INLINE float compute_luminance(Spectrum intensity) {
+    static MTS_INLINE Float compute_luminance(Spectrum intensity) {
         return hmean(intensity);
     }
 

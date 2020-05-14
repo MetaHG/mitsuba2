@@ -101,11 +101,11 @@ public:
     };
 
     PathIntegrator(const Properties &props) : Base(props) {
-        m_aov_types.push_back(Type::Pure);
-        m_aov_names.push_back("pure.R");
-        m_aov_names.push_back("pure.G");
-        m_aov_names.push_back("pure.B");
-        m_aov_names.push_back("pure.A");
+//        m_aov_types.push_back(Type::Pure);
+//        m_aov_names.push_back("pure.R");
+//        m_aov_names.push_back("pure.G");
+//        m_aov_names.push_back("pure.B");
+//        m_aov_names.push_back("pure.A");
 
         m_aov_types.push_back(Type::IntegratorRGBA);
         m_aov_names.push_back("path.R");
@@ -128,7 +128,7 @@ public:
         for (size_t i = 0; i < m_aov_types.size(); ++i) {
             switch (m_aov_types[i]) {
                 case Type::Pure: {
-                    std::pair<Spectrum, Mask> result_sub = test_path_sample(scene, sampler, ray, aovs, active);
+//                    Log(Warn, "PURE RENDERING");
                     std::pair<Spectrum, Mask> result_sub = pure_path_sample(scene, sampler, ray, aovs, active);
 
                     UnpolarizedSpectrum spec_u = depolarize(result_sub.first);
@@ -152,6 +152,7 @@ public:
                 break;
 
                 case Type::IntegratorRGBA: {
+//                        Log(Warn, "PATH RENDERING");
                         std::pair<Spectrum, Mask> result_sub = path_sample(scene, sampler, ray, aovs, active);
 
                         UnpolarizedSpectrum spec_u = depolarize(result_sub.first);
