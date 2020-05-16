@@ -48,21 +48,18 @@ MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int ma
         return;
     }
 
-    // TODO: Refactor this part ?
-    // std::vector<BVHPrimInfo> prim_info(m_primitives.size());
-    std::vector<BVHPrimInfo> prim_info;
+    std::vector<BVHPrimInfo> prim_info(m_primitives.size());
     for (size_t i = 0; i < m_primitives.size(); i++) {
         switch (m_split_method) {
-        case SplitMethod::SAOH: {
-            prim_info.push_back({ i, m_primitives[i]->bbox(), m_primitives[i]->intensity(), m_primitives[i]->cone() });
-            break;
+            case SplitMethod::SAOH: {
+                prim_info[i] = { i, m_primitives[i]->bbox(), m_primitives[i]->intensity(), m_primitives[i]->cone() };
+                break;
+            }
+            default: {
+                prim_info[i] = { i, m_primitives[i]->bbox() };
+                break;
+            }
         }
-        default: {
-            prim_info.push_back({ i, m_primitives[i]->bbox() });
-            break;
-        }
-        }
-//            prim_info[i] = {i, m_primitives[i]->bbox() };
     }
 
     m_leaf_count = 0;
@@ -283,13 +280,6 @@ MTS_VARIANT Float BVH<Float, Spectrum>::pdf_tree(const SurfaceInteraction3f &si,
         } else {
             Float w_left, w_right;
             std::tie(w_left, w_right) = compute_children_weights(current_offset, si);
-//            std::vector<IBVHEmitter*> emitters(NB_CHILDREN_PER_NODE);
-//            emitters[0] = &m_nodes[current_offset + 1];
-//            emitters[1] = &m_nodes[m_nodes[current_offset].second_child_offset];
-
-//            ScalarFloat* weights = compute_bvh_emitters_weights(emitters, NB_CHILDREN_PER_NODE, si);
-//            w_left = weights[0];
-//            w_right = weights[1];
 
             Float p_left = 0.5f;
             if (w_left + w_right >= std::numeric_limits<Float>::epsilon()) {
@@ -341,7 +331,8 @@ BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::vector<IBVHEmitter
     switch (m_cluster_importance_method) {
         case ClusterImportanceMethod::ORIENTATION_STOCHASTIC_YUKSEL_PAPER: {
             for (size_t i = 0; i < size; i++) {
-                weights[i] *= compute_cone_weight(emitters[i], ref);
+                IBVHEmitter* emitter = emitters[i];
+                weights[i] *= compute_cone_weight(emitter->bbox(), emitter->cone(), ref);
             }
         }
         case ClusterImportanceMethod::BASE_STOCHASTIC_YUKSEL_PAPER: {
@@ -357,7 +348,8 @@ BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::vector<IBVHEmitter
 
         case ClusterImportanceMethod::ORIENTATION_ESTEVEZ_PAPER: {
             for (size_t i = 0; i < size; i++) {
-                weights[i] *= compute_cone_weight(emitters[i], ref);
+                IBVHEmitter* emitter = emitters[i];
+                weights[i] *= compute_cone_weight(emitter->bbox(), emitter->cone(), ref);
             }
         }
         case ClusterImportanceMethod::BASE_ESTEVEZ_PAPER: {
@@ -388,8 +380,8 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
 
     switch (m_cluster_importance_method) {
         case ClusterImportanceMethod::ORIENTATION_STOCHASTIC_YUKSEL_PAPER: {
-            l_weight *= compute_cone_weight(&ln, ref);
-            r_weight *= compute_cone_weight(&rn, ref);
+            l_weight *= compute_cone_weight(ln.node_bbox, ln.node_cone, ref);
+            r_weight *= compute_cone_weight(rn.node_bbox, rn.node_cone, ref);
         }
 
         case ClusterImportanceMethod::BASE_STOCHASTIC_YUKSEL_PAPER: {
@@ -406,8 +398,8 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
 
         case ClusterImportanceMethod::ORIENTATION_ESTEVEZ_PAPER:
         default: {
-            l_weight *= compute_cone_weight(&ln, ref);
-            r_weight *= compute_cone_weight(&rn, ref);
+            l_weight *= compute_cone_weight(ln.node_bbox, ln.node_cone, ref);
+            r_weight *= compute_cone_weight(rn.node_bbox, rn.node_cone, ref);
         }
 
         case ClusterImportanceMethod::BASE_ESTEVEZ_PAPER: {
@@ -423,6 +415,8 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
 
 MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const IBVHEmitter *node, const SurfaceInteraction3f &si) const {
     ScalarVector3f p_to_box_center = normalize(node->bbox().center() - si.p);
+MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const {
+    ScalarVector3f p_to_box_center = normalize(bbox.center() - si.p);
 
 //  MATH_PI
 //    if (!node->bbox.contains(si.p) && node->bcone.normal_angle + node->bcone.emission_angle <= M_PI_2f32 && dot(node->bcone.axis, -p_to_box_center) < 0) {
@@ -430,17 +424,22 @@ MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const IBVH
 //    }
 
     Float in_angle = acos(dot(p_to_box_center, si.n));
+//    Log(Info, "p_to_box_center: %s, si.n: %s", p_to_box_center, si.n);
 
-    Float bangle = node->bbox().solid_angle(si.p);
+    Float bangle = bbox.solid_angle(si.p);
 
     Float min_in_angle = max(in_angle - bangle, 0);
+//    Log(Info, "In_angle: %s, bangle: %s, min_in_angle: %s", rad_to_deg(in_angle), rad_to_deg(bangle), rad_to_deg(min_in_angle));
 
-    Float caxis_p_angle = acos(dot(node->cone().axis, -p_to_box_center));
+    Float caxis_p_angle = acos(dot(cone.axis, -p_to_box_center));
 
-    Float min_e_angle = max(caxis_p_angle - node->cone().normal_angle - bangle, 0);
+    Float min_e_angle = max(caxis_p_angle - cone.normal_angle - bangle, 0);
+//    Log(Info, "caxis_p_angle: %s, min_e_angle: %s", rad_to_deg(caxis_p_angle), rad_to_deg(min_e_angle));
+
+//    Log(Info, "Cluster cone: %s", node->cone());
 
     Float cone_weight = 0;
-    if (min_e_angle < node->cone().emission_angle) {
+    if (min_e_angle < cone.emission_angle) {
         cone_weight = max(cos(min_in_angle), 0) * cos(min_e_angle);
     }
 

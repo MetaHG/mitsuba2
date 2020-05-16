@@ -48,6 +48,14 @@ public:
 
 protected:
     struct BVHPrimInfo {
+        BVHPrimInfo() {
+               prim_number = 0;
+               bbox = ScalarBoundingBox3f();
+               centroid = Point3f(0.0f);
+               intensity = Spectrum(0.0f);
+               cone = ScalarCone3f();
+        }
+
         BVHPrimInfo(size_t prim_number, const ScalarBoundingBox3f &bbox, Spectrum intensity = 0.f, ScalarCone3f cone = ScalarCone3f()):
             prim_number(prim_number), bbox(bbox), centroid(bbox.center()), intensity(intensity), cone(cone) { }
 
@@ -280,7 +288,7 @@ private:
                     ScalarBoundingBox3f &centroid_bbox, ScalarBoundingBox3f &node_bbox, ScalarCone3f &node_cone,
                     int nb_buckets, int &split_dim, int &split_bucket, Float &min_cost);
 
-    Float compute_cone_weight(const IBVHEmitter *node, const SurfaceInteraction3f &si) const;
+    Float compute_cone_weight(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const;
 
     BVHNode* create_leaf(std::vector<BVHPrimInfo> &primitive_info,
                          int start,
