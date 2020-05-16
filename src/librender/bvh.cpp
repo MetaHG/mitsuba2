@@ -413,8 +413,58 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
     return std::pair(l_weight / left_d, r_weight / right_d);
 }
 
-MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const IBVHEmitter *node, const SurfaceInteraction3f &si) const {
-    ScalarVector3f p_to_box_center = normalize(node->bbox().center() - si.p);
+MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight_test(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const {
+    ScalarVector3f p_to_box_center = normalize(bbox.center() - si.p);
+
+    Float cos_incident_angle = dot(p_to_box_center, si.n);
+    Float cos_bounding_angle = 1.0f;
+
+    if (bbox.contains(si.p)) {
+        cos_bounding_angle = 0.0f;
+    } else {
+        for (size_t i = 0; i < 8; i++) {
+            ScalarVector3f p_corner = normalize(bbox.corner(i) - si.p);
+            cos_bounding_angle = enoki::min(cos_bounding_angle, dot(p_to_box_center, p_corner));
+        }
+    }
+
+    Float cos_cone_axis_and_box_to_p = dot(cone.axis, -p_to_box_center);
+    Float cos_cone_normal_angle = cos(cone.normal_angle);
+
+    Float cos_min_incident_angle = 1.0f;
+    Float cos_min_emission_angle = 1.0f;
+
+    bool box_visible = cos_incident_angle < cos_bounding_angle;
+    bool potential_illumination = cos_cone_axis_and_box_to_p - cos_cone_normal_angle - cos_bounding_angle < 0; // THIS IS VERY PROBABLY INCORRECT
+                                                                                                               // The addition in the angle domain is not the same as cos domain.
+
+    if (box_visible || potential_illumination) {
+        Float sin_bounding_angle = sqrt(1.0f - cos_bounding_angle * cos_bounding_angle);
+
+        if (box_visible) {
+            cos_min_incident_angle = cos_incident_angle * cos_bounding_angle +
+                    sqrt(1.0f - cos_incident_angle * cos_incident_angle) * sin_bounding_angle;
+        }
+
+        if (potential_illumination) {
+            Float sin_cone_axis_and_box_to_p = sqrt(1.0f - cos_cone_axis_and_box_to_p * cos_cone_axis_and_box_to_p);
+            Float sin_cone_normal_angle = sqrt(1.0f - cos_cone_normal_angle * cos_cone_normal_angle);
+
+            cos_min_emission_angle = cos_cone_axis_and_box_to_p * cos_cone_normal_angle * cos_bounding_angle
+                    + sin_cone_axis_and_box_to_p * sin_cone_normal_angle * cos_bounding_angle
+                    + sin_cone_axis_and_box_to_p * cos_cone_normal_angle * sin_bounding_angle
+                    - cos_cone_axis_and_box_to_p * sin_cone_normal_angle * sin_bounding_angle;
+        }
+    }
+
+    Float cone_weight = 0;
+    if (cos_min_emission_angle > cos(cone.emission_angle)) {
+        cone_weight = max(cos_min_incident_angle, 0) * cos_min_emission_angle;
+    }
+
+    return cone_weight;
+}
+
 MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const {
     ScalarVector3f p_to_box_center = normalize(bbox.center() - si.p);
 

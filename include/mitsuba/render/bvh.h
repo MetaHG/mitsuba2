@@ -290,6 +290,8 @@ private:
 
     Float compute_cone_weight(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const;
 
+    Float compute_cone_weight_test(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const;
+
     BVHNode* create_leaf(std::vector<BVHPrimInfo> &primitive_info,
                          int start,
                          int end,
