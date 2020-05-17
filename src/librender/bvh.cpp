@@ -326,9 +326,15 @@ BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::vector<IBVHEmitter
 
     for (size_t i = 0; i < size; i++) {
         weights[i] = compute_luminance(emitters[i]->intensity());
+        distances[i] = ScalarFloat(1.0f);
     }
 
     switch (m_cluster_importance_method) {
+        case ClusterImportanceMethod::POWER: {
+            return weights;
+        }
+        break;
+
         case ClusterImportanceMethod::ORIENTATION_STOCHASTIC_YUKSEL_PAPER: {
             for (size_t i = 0; i < size; i++) {
                 IBVHEmitter* emitter = emitters[i];
@@ -379,6 +385,11 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
     Float right_d = 1.0f;
 
     switch (m_cluster_importance_method) {
+        case ClusterImportanceMethod::POWER: {
+            return std::pair(l_weight, r_weight);
+        }
+        break;
+
         case ClusterImportanceMethod::ORIENTATION_STOCHASTIC_YUKSEL_PAPER: {
             l_weight *= compute_cone_weight(ln.node_bbox, ln.node_cone, ref);
             r_weight *= compute_cone_weight(rn.node_bbox, rn.node_cone, ref);
