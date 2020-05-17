@@ -292,6 +292,33 @@ private:
 
     Float compute_cone_weight_test(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const;
 
+    Float compute_cone_weight_custom(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const;
+
+    MTS_INLINE Float sine(Float x) const {
+        const float B = 4/math::Pi<Float>;
+        const float C = -4/(math::Pi<Float>*math::Pi<Float>);
+
+        float y = B * x + C * x * abs(x);
+
+        //  const float Q = 0.775;
+        const float P = 0.225;
+
+        y = P * (y * abs(y) - y) + y;   // Q * y + P * y * abs(y)
+
+
+        return y;
+    }
+
+    MTS_INLINE Float cosine(Float x) const {
+        return sine(x + (math::Pi<Float>/ 2));
+    }
+
+    MTS_INLINE Float arccosine(Float x) const {
+       return (-0.69813170079773212 * x * x - 0.87266462599716477) * x + 1.5707963267948966;
+    }
+
+
+
     BVHNode* create_leaf(std::vector<BVHPrimInfo> &primitive_info,
                          int start,
                          int end,

@@ -465,6 +465,37 @@ MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight_test(const
     return cone_weight;
 }
 
+MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight_custom(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const {
+    ScalarVector3f p_to_box_center = normalize(bbox.center() - si.p);
+
+//  MATH_PI
+//    if (!node->bbox.contains(si.p) && node->bcone.normal_angle + node->bcone.emission_angle <= M_PI_2f32 && dot(node->bcone.axis, -p_to_box_center) < 0) {
+//        return 0;
+//    }
+
+    Float in_angle = arccosine(dot(p_to_box_center, si.n));
+//    Log(Info, "p_to_box_center: %s, si.n: %s", p_to_box_center, si.n);
+
+    Float bangle = bbox.solid_angle(si.p);
+
+    Float min_in_angle = max(in_angle - bangle, 0);
+//    Log(Info, "In_angle: %s, bangle: %s, min_in_angle: %s", rad_to_deg(in_angle), rad_to_deg(bangle), rad_to_deg(min_in_angle));
+
+    Float caxis_p_angle = arccosine(dot(cone.axis, -p_to_box_center));
+
+    Float min_e_angle = max(caxis_p_angle - cone.normal_angle - bangle, 0);
+//    Log(Info, "caxis_p_angle: %s, min_e_angle: %s", rad_to_deg(caxis_p_angle), rad_to_deg(min_e_angle));
+
+//    Log(Info, "Cluster cone: %s", node->cone());
+
+    Float cone_weight = 0;
+    if (min_e_angle < cone.emission_angle) {
+        cone_weight = max(cosine(min_in_angle), 0) * cosine(min_e_angle);
+    }
+
+    return cone_weight;
+}
+
 MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const {
     ScalarVector3f p_to_box_center = normalize(bbox.center() - si.p);
 
