@@ -12,7 +12,7 @@ NAMESPACE_BEGIN(mitsuba)
 MTS_VARIANT BVH<Float,Spectrum>::BVH(const Properties &props) {
     m_split_mesh = props.bool_("split_mesh", true);
 
-    const std::string split_metric = props.as_string("split_metric", "saoh");
+    const std::string split_metric = props.string("split_metric", "saoh");
     if (split_metric == "equal_counts") {
         m_split_method = SplitMethod::EqualCounts;
     } else if (split_metric == "middle") {
@@ -23,7 +23,7 @@ MTS_VARIANT BVH<Float,Spectrum>::BVH(const Properties &props) {
         m_split_method = SplitMethod::SAOH;
     }
 
-    const std::string cluster_importance = props.as_string("cluster_importance", "orientation_estevez");
+    const std::string cluster_importance = props.string("cluster_importance", "orientation_estevez");
     if (cluster_importance == "power") {
         m_cluster_importance_method = ClusterImportanceMethod::POWER;
     } else if (cluster_importance == "base_yuksel") {
