@@ -7,6 +7,38 @@ NAMESPACE_BEGIN(mitsuba)
 #define CONE_SCALE_FACTOR 0.5
 #define YUKSEL_DISTANCE_RATIO 1.0f
 #define NB_CHILDREN_PER_NODE 2
+#define MAX_PRIMS_IN_NODE 255
+
+MTS_VARIANT BVH<Float,Spectrum>::BVH(const Properties &props) {
+    m_split_mesh = props.bool_("split_mesh", true);
+
+    const std::string split_metric = props.as_string("split_metric", "saoh");
+    if (split_metric == "equal_counts") {
+        m_split_method = SplitMethod::EqualCounts;
+    } else if (split_metric == "middle") {
+        m_split_method = SplitMethod::Middle;
+    } else if (split_metric == "sah") {
+        m_split_method = SplitMethod::SAH;
+    } else {
+        m_split_method = SplitMethod::SAOH;
+    }
+
+    const std::string cluster_importance = props.as_string("cluster_importance", "orientation_estevez");
+    if (cluster_importance == "power") {
+        m_cluster_importance_method = ClusterImportanceMethod::POWER;
+    } else if (cluster_importance == "base_yuksel") {
+        m_cluster_importance_method = ClusterImportanceMethod::BASE_STOCHASTIC_YUKSEL_PAPER;
+    } else if (cluster_importance == "orientation_yuksel") {
+        m_cluster_importance_method = ClusterImportanceMethod::ORIENTATION_STOCHASTIC_YUKSEL_PAPER;
+    } else if (cluster_importance == "base_estevez") {
+        m_cluster_importance_method = ClusterImportanceMethod::BASE_ESTEVEZ_PAPER;
+    } else {
+        m_cluster_importance_method = ClusterImportanceMethod::ORIENTATION_ESTEVEZ_PAPER;
+    }
+
+    m_visualize_volumes = props.bool_("visualization", false);
+    m_max_prims_in_node = min(MAX_PRIMS_IN_NODE, props.int_("max_prims_in_node", 1));
+}
 
 MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int max_prims_in_node,
                                       SplitMethod split_method, ClusterImportanceMethod cluster_importance_method, bool visualize_volumes):
@@ -15,34 +47,30 @@ MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int ma
 
     Log(Info, "Building a SAOH BVH Light Hierarchy");
 
-    m_emitter_stats = std::vector<int>();
-    m_primitives = std::vector<BVHPrimitive*>();
-    for (size_t i = 0; i < p.size(); i++) {
-        Shape *shape = p[i].get()->shape();
-        if (shape && shape->is_mesh()) {
-            Mesh *mesh = static_cast<Mesh*>(shape);
-            ScalarIndex skipped_face_count = 0;
-            for (ScalarIndex j = 0; j < mesh->face_count(); j++) {
-                if (mesh->face_area(j) > 0) { // Don't add degenerate triangle with surface area of 0
-                    m_primitives.push_back(new BVHPrimitive(p[i], j, mesh->face_bbox(j), mesh->face_cone(j)));
-                    m_emitter_stats.push_back(0);
-                } else {
-                    skipped_face_count += 1;
-                }
-            }
+    set_primitives(p);
+    build();
+}
 
-            if (skipped_face_count > 0) {
-                Log(Warn, "BVH Light Hierarchy: Skipped %s faces (area is zero) of mesh with id %s", skipped_face_count, mesh->id());
-            }
+MTS_VARIANT BVH<Float, Spectrum>::~BVH() {
+    // TODO: Clean this
+    auto b = m_emitter_stats.begin();
+    auto e = m_emitter_stats.end();
+    auto q = m_emitter_stats.begin();
+    std::advance(q, (int) (0.5 * m_emitter_stats.size()));
+    std::nth_element(b, q, e);
+    std::cout << "QUANTILE: " << *q << std::endl;
 
-//            TODO: ADD POSSIBILITY TO NOT SPLIT MESHES
-//            m_emitter_stats.push_back(0);
-//            m_primitives.push_back(new BVHPrimitive(p[i], 0, p[i]->bbox(), ScalarCone3f(ScalarVector3f(1.0, 0.0, 0.0), M_PIf32, M_PIf32))); // Cone would need to be computed by going through triangles probably.
-        } else {
-            m_primitives.push_back(new BVHPrimitive(p[i]));
-        }
+    std::cout << "TREE NODE: " << m_nodes->cone() << std::endl;
+
+    for (BVHPrimitive* prim: m_primitives) {
+        delete prim;
     }
 
+    delete[] m_nodes;
+}
+
+MTS_VARIANT void BVH<Float,Spectrum>::build() {
+    Log(Info, "Building a SAOH BVH Light Hierarchy");
 
     if (m_primitives.size() == 0) {
         return;
@@ -88,22 +116,32 @@ MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int ma
               "  Total nodes: %s", m_primitives.size(), m_leaf_count, m_total_nodes);
 }
 
-MTS_VARIANT BVH<Float, Spectrum>::~BVH() {
-    // TODO: Clean this
-    auto b = m_emitter_stats.begin();
-    auto e = m_emitter_stats.end();
-    auto q = m_emitter_stats.begin();
-    std::advance(q, (int) (0.5 * m_emitter_stats.size()));
-    std::nth_element(b, q, e);
-    std::cout << "QUANTILE: " << *q << std::endl;
+MTS_VARIANT void BVH<Float, Spectrum>::set_primitives(host_vector<ref<Emitter>, Float> emitters) {
+    m_emitter_stats = std::vector<int>();
+    m_primitives = std::vector<BVHPrimitive*>();
+    for (size_t i = 0; i < emitters.size(); i++) {
+        Shape *shape = emitters[i].get()->shape();
+        if (shape && shape->is_mesh() && m_split_mesh) {
+            Mesh *mesh = static_cast<Mesh*>(shape);
 
-    std::cout << "TREE NODE: " << m_nodes->cone() << std::endl;
+            ScalarIndex skipped_face_count = 0;
+            for (ScalarIndex j = 0; j < mesh->face_count(); j++) {
+                if (mesh->face_area(j) > 0) { // Don't add degenerate triangle with surface area of 0
+                    m_primitives.push_back(new BVHPrimitive(emitters[i], j, mesh->face_bbox(j), mesh->face_cone(j)));
+                    m_emitter_stats.push_back(0);
+                } else {
+                    skipped_face_count += 1;
+                }
+            }
 
-    for (BVHPrimitive* prim: m_primitives) {
-        delete prim;
+            if (skipped_face_count > 0) {
+                Log(Warn, "BVH Light Hierarchy: Skipped %s faces (area is zero) of mesh with id %s", skipped_face_count, mesh->id());
+            }
+        } else {
+            m_emitter_stats.push_back(0);
+            m_primitives.push_back(new BVHPrimitive(emitters[i]));
+        }
     }
-
-    delete[] m_nodes;
 }
 
 MTS_VARIANT std::pair<typename BVH<Float, Spectrum>::DirectionSample3f, Spectrum>
@@ -129,7 +167,7 @@ MTS_VARIANT Float BVH<Float, Spectrum>::pdf_emitter_direction(const SurfaceInter
     ScalarIndex face_idx = ds.prim_index;
 
     Float emitter_pdf = 1.0f;
-    if (shape->is_mesh()) {
+    if (shape->is_mesh() && m_split_mesh) {
         const Mesh *mesh = static_cast<const Mesh*>(shape);
         if (mesh->face_area(face_idx) == 0) { // Handle degenerate triangles
             return 0;

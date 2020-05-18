@@ -3,6 +3,7 @@
 #include <mitsuba/core/bbox.h>
 #include <mitsuba/core/fwd.h>
 #include <mitsuba/core/vector.h>
+#include <mitsuba/core/properties.h>
 
 #include <mitsuba/render/emitter.h>
 
@@ -23,10 +24,16 @@ public:
     using ScalarIndex = uint32_t; // TODO: See how to import this from shape
     using EmitterPtr = replace_scalar_t<Float, const Emitter *>;
 
+    BVH(const Properties &props);
+
     BVH(host_vector<ref<Emitter>, Float> p, int max_prims_in_node, SplitMethod split_method,
         ClusterImportanceMethod cluster_importance_method, bool visualize_volumes = false);
 
     ~BVH();
+
+    void build();
+
+    void set_primitives(host_vector<ref<Emitter>, Float> emitters);
 
     std::pair<DirectionSample3f, Spectrum> sample_emitter(const Float &tree_sample, const SurfaceInteraction3f &ref,
                                                           const Point2f &emitter_sample, const Mask active);
@@ -351,9 +358,10 @@ private:
     };
 
 private:
-    const int m_max_prims_in_node;
-    const SplitMethod m_split_method;
-    const ClusterImportanceMethod m_cluster_importance_method;
+    int m_max_prims_in_node;
+    SplitMethod m_split_method;
+    ClusterImportanceMethod m_cluster_importance_method;
+    bool m_split_mesh;
     std::vector<BVHPrimitive*> m_primitives;
     std::unordered_map<std::pair<std::string, ScalarIndex>, ScalarIndex, HashPair> m_prim_index_map;
     LinearBVHNode *m_nodes = nullptr;
@@ -363,4 +371,5 @@ private:
     std::vector<int> m_emitter_stats;
 };
 
+MTS_EXTERN_CLASS_RENDER(BVH)
 NAMESPACE_END(mitsuba)
