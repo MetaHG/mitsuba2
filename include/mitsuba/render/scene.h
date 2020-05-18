@@ -222,7 +222,7 @@ protected:
     ref<Integrator> m_integrator;
     ref<Emitter> m_environment;
 
-    BVH<Float, Spectrum> *m_bvh;
+    BVH<Float, Spectrum> *m_bvh = nullptr;
     mutable std::ofstream m_colors_stats_file;
 };
 

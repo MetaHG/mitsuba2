@@ -20,8 +20,6 @@
 
 NAMESPACE_BEGIN(mitsuba)
 
-// SIMPLE SWITCH TO GO BACK TO REF BUILD
-//#define REF
 // ACTIVATE STATISTICS REGISTERING
 //#define STAT
 
@@ -103,11 +101,19 @@ MTS_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props) {
     for (Emitter *emitter: m_emitters)
         emitter->set_scene(this);
 
-    // BVH
-    // SIMPLE SWITCH TO GO BACK TO REF BUILD
-#if !defined(REF)
-    m_bvh = new BVH<Float, Spectrum>(m_emitters, 1, SplitMethod::SAOH, ClusterImportanceMethod::ORIENTATION_ESTEVEZ_PAPER, false);
-#endif
+    // Light hierarchy related
+    Properties bvh_props = Properties();
+    bvh_props.set_bool("split_mesh", props.bool_("lighttree_split_mesh", true));
+    bvh_props.set_bool("visualization", props.bool_("lighttree_visualization", false));
+    bvh_props.set_int("max_prims_in_node", props.int_("lighttree_max_prims_in_node", 1));
+    bvh_props.set_string("split_metric", props.as_string("lighttree_split_metric", "saoh"));
+    bvh_props.set_string("cluster_importance", props.as_string("lighttree_cluster_importance", "orientation_estevez"));
+//        std::cout << props.as_string("lighttree_split_metric") << std::endl;
+    if (props.bool_("lighttree", true)) {
+        m_bvh = new BVH<Float, Spectrum>(bvh_props);
+        m_bvh->set_primitives(m_emitters);
+        m_bvh->build();
+    }
 
 #if defined(STAT)
     m_colors_stats_file = std::ofstream("colors_stats.csv", std::ofstream::out);
@@ -120,9 +126,8 @@ MTS_VARIANT Scene<Float, Spectrum>::~Scene() {
     else
         accel_release_cpu();
 
-#if !defined(REF)
-    delete(m_bvh);
-#endif
+    if (m_bvh)
+        delete(m_bvh);
 
 #if defined(STAT)
     m_colors_stats_file.close();
@@ -176,7 +181,20 @@ Scene<Float, Spectrum>::sample_emitter_direction_pure(const SurfaceInteraction3f
     Spectrum spec;
 
     if (likely(!m_emitters.empty())) {
-        std::tie(ds, spec) = m_bvh->sample_emitter_pure(tree_sample, ref, sample, active);
+        if (m_bvh) {
+            std::tie(ds, spec) = m_bvh->sample_emitter_pure(tree_sample, ref, sample, active);
+        } else {
+            ScalarFloat emitter_pdf = 1.f / m_emitters.size();
+
+            // Randomly pick an emitter
+            UInt32 index = min(UInt32(sample.x() * (ScalarFloat) m_emitters.size()), (uint32_t) m_emitters.size()-1);
+
+            // Rescale sample.x() to lie in [0,1) again
+            sample.x() = (sample.x() - index*emitter_pdf) * m_emitters.size();
+
+            EmitterPtr emitter = gather<EmitterPtr>(m_emitters.data(), index, active);
+            spec = emitter->get_radiance();
+        }
         active &= neq(ds.pdf, 0.f);
     } else {
         ds = zero<DirectionSample3f>();
@@ -193,7 +211,11 @@ Scene<Float, Spectrum>::pdf_emitter_direction_pure(const SurfaceInteraction3f &r
     MTS_MASK_ARGUMENT(active);
     using EmitterPtr = replace_scalar_t<Float, const Emitter *>;
 
-    return m_bvh->pdf_emitter_direction_pure(ref, ds, active);
+    if (m_bvh) {
+        return m_bvh->pdf_emitter_direction_pure(ref, ds, active);
+    } else {
+        return 1.f / m_emitters.size();
+    }
 }
 
 MTS_VARIANT std::pair<typename Scene<Float, Spectrum>::DirectionSample3f, Spectrum>
@@ -203,10 +225,9 @@ Scene<Float, Spectrum>::sample_emitter_direction_custom(const SurfaceInteraction
 
     using EmitterPtr = replace_scalar_t<Float, Emitter*>;
 
-    // SIMPLE SWITCH TO GO BACK TO REFERENCE BUILD
-#if defined(REF)
-    return sample_emitter_direction(ref, sample_, test_visibility, active);
-#endif
+    // If no light hierarchy is present, switch back to reference build
+    if (!m_bvh)
+        return sample_emitter_direction(ref, sample_, test_visibility, active);
 
     Point2f sample(sample_.x(), sample_.y());
     Float tree_sample(sample_.z());
@@ -243,10 +264,9 @@ Scene<Float, Spectrum>::pdf_emitter_direction_custom(const SurfaceInteraction3f 
     MTS_MASK_ARGUMENT(active);
     using EmitterPtr = replace_scalar_t<Float, const Emitter *>;
 
-    // SIMPLE SWITCH TO GO BACK TO REF BUILD
-#if defined(REF)
-    return pdf_emitter_direction(ref, ds, active);
-#endif
+    // If no light hierarchy is present, switch back to reference build
+    if (!m_bvh)
+        return pdf_emitter_direction(ref, ds, active);
 
     return m_bvh->pdf_emitter_direction(ref, ds, active);
 }
