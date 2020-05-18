@@ -98,9 +98,8 @@ MTS_VARIANT void BVH<Float,Spectrum>::build() {
     root = recursive_build(prim_info, 0, m_primitives.size(), &total_nodes, ordered_prims, "_");
     m_primitives.swap(ordered_prims);
 
-    m_prim_index_map = std::unordered_map<std::pair<std::string, ScalarIndex>, ScalarIndex, HashPair>();
     for (ScalarIndex i = 0; i < m_primitives.size(); i++) {
-        m_prim_index_map.insert({std::pair(m_primitives[i]->emitter->id(), m_primitives[i]->face_id), i}); //TODO: MODIFIES THE EMITTER ID EVERYWHERE; SHOULD BE THE POINTER INSTEAD
+        m_prim_index_map[m_primitives[i]->emitter][m_primitives[i]->face_id] = i;
     }
 
     m_nodes = new LinearBVHNode[total_nodes];
@@ -119,6 +118,7 @@ MTS_VARIANT void BVH<Float,Spectrum>::build() {
 MTS_VARIANT void BVH<Float, Spectrum>::set_primitives(host_vector<ref<Emitter>, Float> emitters) {
     m_emitter_stats = std::vector<int>();
     m_primitives = std::vector<BVHPrimitive*>();
+    m_prim_index_map = std::unordered_map<const Emitter*, std::vector<ScalarIndex>>();
     for (size_t i = 0; i < emitters.size(); i++) {
         Shape *shape = emitters[i].get()->shape();
         if (shape && shape->is_mesh() && m_split_mesh) {
@@ -134,12 +134,15 @@ MTS_VARIANT void BVH<Float, Spectrum>::set_primitives(host_vector<ref<Emitter>, 
                 }
             }
 
+            m_prim_index_map[emitters[i]] = std::vector<ScalarIndex>(mesh->face_count(), -1);
+
             if (skipped_face_count > 0) {
                 Log(Warn, "BVH Light Hierarchy: Skipped %s faces (area is zero) of mesh with id %s", skipped_face_count, mesh->id());
             }
         } else {
             m_emitter_stats.push_back(0);
             m_primitives.push_back(new BVHPrimitive(emitters[i]));
+            m_prim_index_map[emitters[i]] = std::vector<ScalarIndex>(1, -1);
         }
     }
 }
@@ -302,7 +305,7 @@ BVH<Float, Spectrum>::sample_tree(const SurfaceInteraction3f &si, float &importa
 MTS_VARIANT Float BVH<Float, Spectrum>::pdf_tree(const SurfaceInteraction3f &si, const Emitter *emitter, const ScalarIndex face_idx) {
     Float pdf = 1.0;
 
-    ScalarIndex prim_idx = m_prim_index_map[std::pair(emitter->id(), face_idx)];
+    ScalarIndex prim_idx = m_prim_index_map[emitter][face_idx];
     BVHPrimitive* prim = m_primitives[prim_idx];
 
     int prev_offset;
