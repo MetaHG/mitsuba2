@@ -479,34 +479,33 @@ MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight_test(const
             cos_bounding_angle = enoki::min(cos_bounding_angle, dot(p_to_box_center, p_corner));
         }
     }
+    Float sin_bounding_angle = sqrt(1.0f - cos_bounding_angle * cos_bounding_angle);
 
     Float cos_cone_axis_and_box_to_p = dot(cone.axis, -p_to_box_center);
+    Float sin_cone_axis_and_box_to_p = sqrt(1.0f - cos_cone_axis_and_box_to_p * cos_cone_axis_and_box_to_p); //TODO: use safe_sqrt everywhere
+
     Float cos_cone_normal_angle = cos(cone.normal_angle);
 
     Float cos_min_incident_angle = 1.0f;
     Float cos_min_emission_angle = 1.0f;
 
     bool box_visible = cos_incident_angle < cos_bounding_angle;
-    bool potential_illumination = cos_cone_axis_and_box_to_p - cos_cone_normal_angle - cos_bounding_angle < 0; // THIS IS VERY PROBABLY INCORRECT
-                                                                                                               // The addition in the angle domain is not the same as cos domain.
 
-    if (box_visible || potential_illumination) {
-        Float sin_bounding_angle = sqrt(1.0f - cos_bounding_angle * cos_bounding_angle);
+    bool potential_illumination = cos_cone_axis_and_box_to_p * cos_bounding_angle
+            + sin_cone_axis_and_box_to_p * sin_bounding_angle < cos_cone_normal_angle;
 
-        if (box_visible) {
-            cos_min_incident_angle = cos_incident_angle * cos_bounding_angle +
-                    sqrt(1.0f - cos_incident_angle * cos_incident_angle) * sin_bounding_angle;
-        }
+    if (box_visible) {
+        cos_min_incident_angle = cos_incident_angle * cos_bounding_angle +
+                sqrt(1.0f - cos_incident_angle * cos_incident_angle) * sin_bounding_angle;
+    }
 
-        if (potential_illumination) {
-            Float sin_cone_axis_and_box_to_p = sqrt(1.0f - cos_cone_axis_and_box_to_p * cos_cone_axis_and_box_to_p);
-            Float sin_cone_normal_angle = sqrt(1.0f - cos_cone_normal_angle * cos_cone_normal_angle);
+    if (potential_illumination) {
+        Float sin_cone_normal_angle = sqrt(1.0f - cos_cone_normal_angle * cos_cone_normal_angle);
 
-            cos_min_emission_angle = cos_cone_axis_and_box_to_p * cos_cone_normal_angle * cos_bounding_angle
-                    + sin_cone_axis_and_box_to_p * sin_cone_normal_angle * cos_bounding_angle
-                    + sin_cone_axis_and_box_to_p * cos_cone_normal_angle * sin_bounding_angle
-                    - cos_cone_axis_and_box_to_p * sin_cone_normal_angle * sin_bounding_angle;
-        }
+        cos_min_emission_angle = cos_cone_axis_and_box_to_p * cos_cone_normal_angle * cos_bounding_angle
+                + sin_cone_axis_and_box_to_p * sin_cone_normal_angle * cos_bounding_angle
+                + sin_cone_axis_and_box_to_p * cos_cone_normal_angle * sin_bounding_angle
+                - cos_cone_axis_and_box_to_p * sin_cone_normal_angle * sin_bounding_angle;
     }
 
     Float cone_weight = 0;
