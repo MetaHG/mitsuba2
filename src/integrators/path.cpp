@@ -101,11 +101,13 @@ public:
     };
 
     PathIntegrator(const Properties &props) : Base(props) {
-//        m_aov_types.push_back(Type::Pure);
-//        m_aov_names.push_back("pure.R");
-//        m_aov_names.push_back("pure.G");
-//        m_aov_names.push_back("pure.B");
-//        m_aov_names.push_back("pure.A");
+        if (props.bool_("lighttree_colored_emitters", false)) {
+            m_aov_types.push_back(Type::Pure);
+            m_aov_names.push_back("pure.R");
+            m_aov_names.push_back("pure.G");
+            m_aov_names.push_back("pure.B");
+            m_aov_names.push_back("pure.A");
+        }
 
         m_aov_types.push_back(Type::IntegratorRGBA);
         m_aov_names.push_back("path.R");
