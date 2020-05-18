@@ -31,6 +31,7 @@ template <typename Float, typename Spectrum> class ShapeKDTree;
 template <typename Float, typename Spectrum> class Texture;
 template <typename Float, typename Spectrum> class Volume;
 template <typename Float, typename Spectrum> class MeshAttribute;
+template <typename Float, typename Spectrum> class BVH;
 
 template <typename Float, typename Spectrum> struct DirectionSample;
 template <typename Float, typename Spectrum> struct PositionSample;
@@ -87,6 +88,7 @@ template <typename Float_, typename Spectrum_> struct RenderAliases {
     using ReconstructionFilter   = mitsuba::ReconstructionFilter<FloatU, SpectrumU>;
     using Texture                = mitsuba::Texture<FloatU, SpectrumU>;
     using Volume                 = mitsuba::Volume<FloatU, SpectrumU>;
+    using BVH                    = mitsuba::BVH<FloatU, SpectrumU>;
 
     using MeshAttribute          = mitsuba::MeshAttribute<FloatU, SpectrumU>;
 
@@ -143,6 +145,7 @@ template <typename Float_, typename Spectrum_> struct RenderAliases {
     using ReconstructionFilter   = typename RenderAliases::ReconstructionFilter;                   \
     using Texture                = typename RenderAliases::Texture;                                \
     using Volume                 = typename RenderAliases::Volume;                                 \
+    using BVH                    = typename RenderAliases::BVH;                                    \
     using ObjectPtr              = typename RenderAliases::ObjectPtr;                              \
     using BSDFPtr                = typename RenderAliases::BSDFPtr;                                \
     using MediumPtr              = typename RenderAliases::MediumPtr;                              \
