@@ -7,6 +7,7 @@
 #include <mitsuba/core/transform.h>
 #include <mitsuba/core/distr_1d.h>
 #include <mitsuba/core/properties.h>
+#include <mitsuba/core/cone.h>
 #include <tbb/spin_mutex.h>
 #include <unordered_map>
 
@@ -105,7 +106,7 @@ public:
 
     /// Returns the surface area of the face with index \c index
     template <typename Index>
-    auto face_area(Index index, mask_t<Index> active = true) const {
+    MTS_INLINE auto face_area(Index index, mask_t<Index> active = true) const {
         auto fi = face_indices(index, active);
 
         auto p0 = vertex_position(fi[0], active),
@@ -116,7 +117,7 @@ public:
     }
 
     template <typename Index>
-    auto face_bbox(Index index, mask_t<Index> active = true) const {
+    MTS_INLINE auto face_bbox(Index index, mask_t<Index> active = true) const {
         auto fi = face_indices(index, active);
 
         auto p0 = vertex_position(fi[0], active),
@@ -131,7 +132,7 @@ public:
     }
 
     template <typename Index>
-    auto face_cone(Index index, mask_t<Index> active = true) const {
+    MTS_INLINE auto face_cone(Index index, mask_t<Index> active = true) const {
         auto fi = face_indices(index, active);
 
         auto p0 = vertex_position(fi[0], active),
@@ -151,6 +152,15 @@ public:
         }
 
         return cone;
+    }
+
+    MTS_INLINE ScalarCone3f cone() const override {
+        ScalarCone3f mesh_cone = ScalarCone3f();
+        for (ScalarIndex face_idx = 0; face_idx < m_face_count; face_idx++) {
+            mesh_cone = ScalarCone3f::merge(mesh_cone, face_cone(face_idx));
+        }
+
+        return mesh_cone;
     }
 
     virtual ScalarIndex face(const PositionSample3f &ps, Mask active) const;

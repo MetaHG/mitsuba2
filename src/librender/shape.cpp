@@ -399,6 +399,11 @@ Shape<Float, Spectrum>::surface_area() const {
     NotImplementedError("surface_area");
 }
 
+MTS_VARIANT typename Shape<Float, Spectrum>::ScalarCone3f
+Shape<Float, Spectrum>::cone() const {
+    NotImplementedError("cone");
+}
+
 MTS_VARIANT typename Shape<Float, Spectrum>::ScalarBoundingBox3f
 Shape<Float, Spectrum>::bbox(ScalarIndex) const {
     return bbox();

@@ -234,6 +234,8 @@ public:
      */
     virtual ScalarBoundingBox3f bbox(ScalarIndex index, const ScalarBoundingBox3f &clip) const;
 
+    virtual ScalarCone3f cone() const;
+
     /**
      * \brief Return the shape's surface area.
      *
