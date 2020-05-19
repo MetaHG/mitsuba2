@@ -363,7 +363,7 @@ private:
     ClusterImportanceMethod m_cluster_importance_method;
     bool m_split_mesh;
     std::vector<BVHPrimitive*> m_primitives;
-    std::unordered_map<std::pair<std::string, ScalarIndex>, ScalarIndex, HashPair> m_prim_index_map;
+    std::unordered_map<const Emitter*, std::vector<ScalarIndex>> m_prim_index_map;
     LinearBVHNode *m_nodes = nullptr;
     int m_total_nodes;
     int m_leaf_count;
