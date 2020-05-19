@@ -321,7 +321,7 @@ private:
     }
 
     MTS_INLINE Float arccosine(Float x) const {
-       return (-0.69813170079773212 * x * x - 0.87266462599716477) * x + 1.5707963267948966;
+       return (-Float(0.69813170079773212) * x * x - Float(0.87266462599716477)) * x + Float(1.5707963267948966);
     }
 
 
