@@ -498,17 +498,21 @@ MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const Scal
         return 1.0f;
     }
 
-    ScalarPoint3f bbox_corners[8] = {bbox.min,
-                                ScalarPoint3f(bbox.max[0], bbox.min[1], bbox.min[2]),
-                                ScalarPoint3f(bbox.min[0], bbox.max[1], bbox.min[2]),
-                                ScalarPoint3f(bbox.max[0], bbox.max[1], bbox.min[2]),
-                                ScalarPoint3f(bbox.min[0], bbox.min[1], bbox.max[2]),
-                                ScalarPoint3f(bbox.max[0], bbox.min[1], bbox.max[2]),
-                                ScalarPoint3f(bbox.min[0], bbox.max[1], bbox.max[2]),
-                                bbox.max};
-
     for (size_t i = 0; i < 8; i++) {
-        ScalarVector3f p_corner = normalize(bbox_corners[i] - si.p);
+        ScalarPoint3f bbox_corner;
+
+        switch (i) {
+            case 0: bbox_corner = bbox.min; break;
+            case 1: bbox_corner = ScalarPoint3f(bbox.max[0], bbox.min[1], bbox.min[2]); break;
+            case 2: bbox_corner = ScalarPoint3f(bbox.min[0], bbox.max[1], bbox.min[2]); break;
+            case 3: bbox_corner = ScalarPoint3f(bbox.max[0], bbox.max[1], bbox.min[2]); break;
+            case 4: bbox_corner = ScalarPoint3f(bbox.min[0], bbox.min[1], bbox.max[2]); break;
+            case 5: bbox_corner = ScalarPoint3f(bbox.max[0], bbox.min[1], bbox.max[2]); break;
+            case 6: bbox_corner = ScalarPoint3f(bbox.min[0], bbox.max[1], bbox.max[2]); break;
+            case 7: bbox_corner = bbox.max; break;
+        }
+
+        ScalarVector3f p_corner = normalize(bbox_corner - si.p);
         cos_bounding_angle = enoki::min(cos_bounding_angle, dot(p_to_box_center, p_corner));
     }
 
