@@ -498,8 +498,17 @@ MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const Scal
         return 1.0f;
     }
 
+    ScalarPoint3f bbox_corners[8] = {bbox.min,
+                                ScalarPoint3f(bbox.max[0], bbox.min[1], bbox.min[2]),
+                                ScalarPoint3f(bbox.min[0], bbox.max[1], bbox.min[2]),
+                                ScalarPoint3f(bbox.max[0], bbox.max[1], bbox.min[2]),
+                                ScalarPoint3f(bbox.min[0], bbox.min[1], bbox.max[2]),
+                                ScalarPoint3f(bbox.max[0], bbox.min[1], bbox.max[2]),
+                                ScalarPoint3f(bbox.min[0], bbox.max[1], bbox.max[2]),
+                                bbox.max};
+
     for (size_t i = 0; i < 8; i++) {
-        ScalarVector3f p_corner = normalize(bbox.corner(i) - si.p);
+        ScalarVector3f p_corner = normalize(bbox_corners[i] - si.p);
         cos_bounding_angle = enoki::min(cos_bounding_angle, dot(p_to_box_center, p_corner));
     }
 
