@@ -134,7 +134,7 @@ protected:
         }
 
         inline ScalarCone3f cone() const override {
-            return node_cone;
+            return node_cone_cosine;
         }
         // --------------------------------------------------------
 
@@ -147,7 +147,7 @@ protected:
         uint16_t prim_count; // 0 -> inner node
         uint8_t axis;
         Spectrum node_intensity;
-        ScalarCone3f node_cone;
+        ScalarCone3f node_cone_cosine;
         int parent_offset;
         uint8_t pad[1]; // Padding for memory/cache alignment
     };
@@ -295,9 +295,9 @@ private:
                     ScalarBoundingBox3f &centroid_bbox, ScalarBoundingBox3f &node_bbox, ScalarCone3f &node_cone,
                     int nb_buckets, int &split_dim, int &split_bucket, Float &min_cost);
 
-    Float compute_cone_weight(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const;
+    Float compute_cone_weight_old(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const;
 
-    Float compute_cone_weight_test(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const;
+    Float compute_cone_weight(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const;
 
     Float compute_cone_weight_custom(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const;
 

@@ -432,8 +432,8 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
         break;
 
         case ClusterImportanceMethod::ORIENTATION_STOCHASTIC_YUKSEL_PAPER: {
-            l_weight *= compute_cone_weight(ln.node_bbox, ln.node_cone, ref);
-            r_weight *= compute_cone_weight(rn.node_bbox, rn.node_cone, ref);
+            l_weight *= compute_cone_weight_old(ln.node_bbox, ln.node_cone_cosine, ref);
+            r_weight *= compute_cone_weight_old(rn.node_bbox, rn.node_cone_cosine, ref);
         }
 
         case ClusterImportanceMethod::BASE_STOCHASTIC_YUKSEL_PAPER: {
@@ -450,22 +450,24 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
 
         case ClusterImportanceMethod::ORIENTATION_ESTEVEZ_PAPER:
         default: {
-            l_weight *= compute_cone_weight(ln.node_bbox, ln.node_cone, ref);
-            r_weight *= compute_cone_weight(rn.node_bbox, rn.node_cone, ref);
+            l_weight *= compute_cone_weight(ln.node_bbox, ln.node_cone_cosine, ref);
+            r_weight *= compute_cone_weight(rn.node_bbox, rn.node_cone_cosine, ref);
 
-            Float l_cone_weight = compute_cone_weight(ln.node_bbox, ln.node_cone, ref);
-            Float l_cone_weight_test = compute_cone_weight_test(ln.node_bbox, ln.node_cone, ref);
-            Float left_error = abs(l_cone_weight_test - l_cone_weight) / l_cone_weight;
-            if (left_error >= 0.01f) {
-                Log(Warn, "Left error: %s, correct: %s, test: %s", left_error, l_cone_weight, l_cone_weight_test);
-            }
+//            Float l_cone_weight = compute_cone_weight_old(ln.node_bbox, ScalarCone3f(ln.node_cone_cosine.axis, acos(ln.node_cone_cosine.normal_angle), acos(ln.node_cone_cosine.emission_angle)), ref);
+//            Float l_cone_weight_test = compute_cone_weight(ln.node_bbox, ln.node_cone_cosine, ref);
+//            Float left_abs_error = abs(l_cone_weight_test - l_cone_weight);
+//            Float left_error = left_abs_error / l_cone_weight;
+//            if (left_error >= 0.01f && left_abs_error > 0.001f) {
+//                Log(Warn, "Left error: %s, correct: %s, test: %s", left_error, l_cone_weight, l_cone_weight_test);
+//            }
 
-            Float r_cone_weight = compute_cone_weight(rn.node_bbox, rn.node_cone, ref);
-            Float r_cone_weight_test = compute_cone_weight_test(rn.node_bbox, rn.node_cone, ref);
-            Float right_error = abs(r_cone_weight_test - r_cone_weight) / r_cone_weight;
-            if (right_error >= 0.01f) {
-                Log(Warn, "Right error: %s, correct: %s, test: %s", right_error, r_cone_weight, r_cone_weight_test);
-            }
+//            Float r_cone_weight = compute_cone_weight_old(rn.node_bbox, ScalarCone3f(rn.node_cone_cosine.axis, acos(rn.node_cone_cosine.normal_angle), acos(rn.node_cone_cosine.emission_angle)), ref);
+//            Float r_cone_weight_test = compute_cone_weight(rn.node_bbox, rn.node_cone_cosine, ref);
+//            Float right_abs_error = abs(r_cone_weight_test - r_cone_weight);
+//            Float right_error = right_abs_error / r_cone_weight;
+//            if (right_error >= 0.01f && right_abs_error > 0.001f) {
+//                Log(Warn, "Right error: %s, correct: %s, test: %s", right_error, r_cone_weight, r_cone_weight_test);
+//            }
 
 
 
@@ -486,7 +488,7 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
     return std::pair(l_weight / left_d, r_weight / right_d);
 }
 
-MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight_test(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const {
+MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone_cosine, const SurfaceInteraction3f &si) const {
     ScalarVector3f p_to_box_center = normalize(bbox.center() - si.p);
 
     Float cos_incident_angle = dot(p_to_box_center, si.n);
@@ -503,10 +505,10 @@ MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight_test(const
 
     Float sin_bounding_angle = safe_sqrt(1.0f - cos_bounding_angle * cos_bounding_angle);
 
-    Float cos_cone_axis_and_box_to_p = dot(cone.axis, -p_to_box_center);
+    Float cos_cone_axis_and_box_to_p = dot(cone_cosine.axis, -p_to_box_center);
     Float sin_cone_axis_and_box_to_p = safe_sqrt(1.0f - cos_cone_axis_and_box_to_p * cos_cone_axis_and_box_to_p);
 
-    Float cos_cone_normal_angle = cos(cone.normal_angle);
+    Float cos_cone_normal_angle = cone_cosine.normal_angle;
     Float sin_cone_normal_angle = safe_sqrt(1.0f - cos_cone_normal_angle * cos_cone_normal_angle);
 
     Float cos_min_incident_angle = 1.0f;
@@ -533,8 +535,9 @@ MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight_test(const
                 - cos_cone_axis_and_box_to_p * sin_cone_normal_angle * sin_bounding_angle;
     }
 
+    Float cos_cone_emission_angle = cone_cosine.emission_angle;
     Float cone_weight = 0;
-    if (cos_min_emission_angle > cos(cone.emission_angle)) {
+    if (cos_min_emission_angle > cos_cone_emission_angle) {
 //        Log(Info, "Test: cos_min_emission_angle: %s", cos_min_emission_angle);
         cone_weight = max(cos_min_incident_angle, 0) * cos_min_emission_angle; // cos_min_incident_angle is not 1 when it should (when cone_weight should be 1)
     }
@@ -542,7 +545,7 @@ MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight_test(const
     return cone_weight;
 }
 
-MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const {
+MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight_old(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const {
     ScalarVector3f p_to_box_center = normalize(bbox.center() - si.p);
 
 //  MATH_PI
@@ -700,7 +703,7 @@ BVH<Float,Spectrum>::recursive_build(std::vector<BVHPrimInfo> &primitive_info,
 MTS_VARIANT int BVH<Float, Spectrum>::flatten_bvh_tree(BVHNode *node, int *offset, int parent_offset) {
     LinearBVHNode *linear_node = &m_nodes[*offset];
     linear_node->node_bbox = node->bbox;
-    linear_node->node_cone = node->bcone;
+    linear_node->node_cone_cosine = ScalarCone3f(node->bcone.axis, cos(node->bcone.normal_angle), cos(node->bcone.emission_angle));
     linear_node->node_intensity = node->intensity;
     linear_node->parent_offset = parent_offset;
     int my_offset = (*offset)++;
