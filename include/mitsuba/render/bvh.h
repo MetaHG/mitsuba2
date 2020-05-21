@@ -237,7 +237,10 @@ protected:
         bool is_triangle;
         ScalarIndex face_id;
         ScalarBoundingBox3f prim_bbox;
-        ScalarCone3f prim_cone;
+        union {
+            ScalarCone3f prim_cone;
+            ScalarCone3f prim_cone_cosine;
+        };
     };
 
 protected:
@@ -249,7 +252,7 @@ protected:
 
     std::pair<Float, Float> compute_children_weights(int offset, const SurfaceInteraction3f &ref);
 
-    ScalarFloat* compute_bvh_emitters_weights(const std::vector<IBVHEmitter*> &emitters, size_t size, const SurfaceInteraction3f &ref) const;
+    ScalarFloat* compute_bvh_emitters_weights(const std::vector<BVHPrimitive*> &emitters, size_t offset, size_t size, const SurfaceInteraction3f &ref) const;
 
     BVHNode* recursive_build(std::vector<BVHPrimInfo> &primitive_info,
                              int start,

@@ -361,12 +361,12 @@ BVH<Float, Spectrum>::sample_leaf(const SurfaceInteraction3f &si, float &importa
 }
 
 MTS_VARIANT typename BVH<Float, Spectrum>::ScalarFloat*
-BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::vector<IBVHEmitter*> &emitters, size_t size, const SurfaceInteraction3f &ref) const {
+BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::vector<BVHPrimitive*> &emitters, size_t offset, size_t size, const SurfaceInteraction3f &ref) const {
     ScalarFloat* weights = new ScalarFloat[size];
     ScalarFloat* distances = new ScalarFloat[size];
 
     for (size_t i = 0; i < size; i++) {
-        weights[i] = compute_luminance(emitters[i]->intensity());
+        weights[i] = compute_luminance(emitters[offset + i]->intensity());
         distances[i] = ScalarFloat(1.0f);
     }
 
@@ -378,15 +378,16 @@ BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::vector<IBVHEmitter
 
         case ClusterImportanceMethod::ORIENTATION_STOCHASTIC_YUKSEL_PAPER: {
             for (size_t i = 0; i < size; i++) {
-                IBVHEmitter* emitter = emitters[i];
-                weights[i] *= compute_cone_weight(emitter->bbox(), emitter->cone(), ref);
+                BVHPrimitive* emitter = emitters[offset + i];
+                weights[i] *= compute_cone_weight(emitter->prim_bbox, emitter->prim_cone_cosine, ref);
+//                weights[i] *= compute_cone_weight_old(emitter->bbox(), emitter->cone(), ref);
             }
         }
         case ClusterImportanceMethod::BASE_STOCHASTIC_YUKSEL_PAPER: {
             for (size_t i = 0; i < size; i++) {
-                distances[i] = emitters[i]->bbox().squared_distance(ref.p);
+                distances[i] = emitters[offset + i]->bbox().squared_distance(ref.p);
 
-                if (distances[i] <= YUKSEL_DISTANCE_RATIO * squared_norm(emitters[i]->bbox().extents())) {
+                if (distances[i] <= YUKSEL_DISTANCE_RATIO * squared_norm(emitters[offset + i]->bbox().extents())) {
                     return weights;
                 }
             }
@@ -395,21 +396,25 @@ BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::vector<IBVHEmitter
 
         case ClusterImportanceMethod::ORIENTATION_ESTEVEZ_PAPER: {
             for (size_t i = 0; i < size; i++) {
-                IBVHEmitter* emitter = emitters[i];
-                weights[i] *= compute_cone_weight(emitter->bbox(), emitter->cone(), ref);
+                BVHPrimitive* emitter = emitters[offset + i];
+                weights[i] *= compute_cone_weight(emitter->prim_bbox, emitter->prim_cone_cosine, ref);
+//                weights[i] *= compute_cone_weight_old(emitter->bbox(), emitter->cone(), ref);
             }
         }
         case ClusterImportanceMethod::BASE_ESTEVEZ_PAPER: {
             for (size_t i = 0; i < size; i++) {
-                distances[i] = max(max(squared_norm(emitters[i]->bbox().extents()) / 4.0f, std::numeric_limits<Float>::epsilon()),
-                                   squared_norm(emitters[i]->bbox().center() - ref.p));
+                distances[i] = max(max(squared_norm(emitters[offset + i]->bbox().extents()) / 4.0f, std::numeric_limits<Float>::epsilon()),
+                                   squared_norm(emitters[offset + i]->bbox().center() - ref.p));
             }
         }
         break;
     }
 
     for (size_t i = 0; i < size; i++) {
-        weights[i] /= distances[i];
+//        weights[i] /= distances[i];
+
+        // Epsilon is added as area_distribution_1d does not handle full zero weights.
+        weights[i] = (weights[i] + std::numeric_limits<Float>::epsilon()) / distances[i];
     }
 
     return weights;
@@ -440,9 +445,8 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
             left_d *= ln.node_bbox.squared_distance(ref.p);
             right_d *= rn.node_bbox.squared_distance(ref.p);
 
-            Float distance_ratio = 1.0f; //TODO: DEFINE IT
-            if (left_d <= distance_ratio * squared_norm(ln.node_bbox.extents())
-                || right_d <= distance_ratio * squared_norm(rn.node_bbox.extents())) {
+            if (left_d <= YUKSEL_DISTANCE_RATIO * squared_norm(ln.node_bbox.extents())
+                || right_d <= YUKSEL_DISTANCE_RATIO * squared_norm(rn.node_bbox.extents())) {
                 return std::pair(l_weight, r_weight);
             }
         }
@@ -713,9 +717,11 @@ BVH<Float,Spectrum>::recursive_build(std::vector<BVHPrimInfo> &primitive_info,
     return node;
 }
 
+// Tree post-construction processing
 MTS_VARIANT int BVH<Float, Spectrum>::flatten_bvh_tree(BVHNode *node, int *offset, int parent_offset) {
     LinearBVHNode *linear_node = &m_nodes[*offset];
     linear_node->node_bbox = node->bbox;
+    // Store cosinus of angles for future computation optimizations (see "compute_cone_weight" function)
     linear_node->node_cone_cosine = ScalarCone3f(node->bcone.axis, cos(node->bcone.normal_angle), cos(node->bcone.emission_angle));
     linear_node->node_intensity = node->intensity;
     linear_node->parent_offset = parent_offset;
@@ -726,7 +732,10 @@ MTS_VARIANT int BVH<Float, Spectrum>::flatten_bvh_tree(BVHNode *node, int *offse
         linear_node->prim_count = node->prim_count;
 
         for (int i = 0; i < linear_node->prim_count; i++) {
-            m_primitives[linear_node->primitives_offset + i]->leaf_offset = my_offset;
+            BVHPrimitive* prim_ptr = m_primitives[linear_node->primitives_offset + i];
+            prim_ptr->leaf_offset = my_offset;
+            // Convert to cone with cosinus angles for future computation optimizations (see "compute_cone_weight" function)
+            prim_ptr->prim_cone_cosine = ScalarCone3f(prim_ptr->prim_cone.axis, cos(prim_ptr->prim_cone.normal_angle), cos(prim_ptr->prim_cone.emission_angle));
         }
     } else {
         linear_node->axis = node->split_axis;
