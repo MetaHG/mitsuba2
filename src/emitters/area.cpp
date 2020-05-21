@@ -69,7 +69,7 @@ public:
         Base::set_shape(shape);
         m_area_times_pi = m_shape->surface_area() * math::Pi<ScalarFloat>;
         m_bbox = m_shape->bbox();
-        m_cone = ScalarCone3f(m_shape->sample_position(Float(0), 0).n, 0, M_PI_2); // TODO: Modify for other area lights than planar meshes.
+        m_cone = ScalarCone3f(m_shape->sample_position(Float(0), 0).n, math::Pi<Float>, math::Pi<Float>/2.0f);
     }
 
     Spectrum eval(const SurfaceInteraction3f &si, Mask active) const override {
