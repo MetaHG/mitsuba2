@@ -246,9 +246,11 @@ protected:
 protected:
     BVHPrimitive* sample_tree(const SurfaceInteraction3f &si, float &importance_ratio, const Float &sample_);
 
-    BVHPrimitive* sample_leaf(const SurfaceInteraction3f &si, float &importance_ratio, const Float &sample_, const LinearBVHNode &leaf) const;
+    BVHPrimitive* sample_leaf(const SurfaceInteraction3f &si, float &importance_ratio, const Float &sample_, const LinearBVHNode &leaf);
 
     Float pdf_tree(const SurfaceInteraction3f &si, const Emitter *emitter, const ScalarIndex face_idx);
+
+    Float pdf_leaf(const SurfaceInteraction3f &si, const LinearBVHNode *leaf, ScalarIndex prim_idx) const;
 
     std::pair<Float, Float> compute_children_weights(int offset, const SurfaceInteraction3f &ref);
 

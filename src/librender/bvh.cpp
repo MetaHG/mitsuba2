@@ -287,22 +287,17 @@ BVH<Float, Spectrum>::sample_tree(const SurfaceInteraction3f &si, float &importa
         }
     }
 
-    // TODO: BUILD DISTRIBUTION FUNCTION TO SAMPLE BETTER THE LEAVES. NEED TO MODIFY PDF CONSEQUENTLY
-    int leaf_offset = m_nodes[offset].primitives_offset;
-    int leaf_prim_count = m_nodes[offset].prim_count;
+    const LinearBVHNode leaf = m_nodes[offset];
+    BVHPrimitive* prim;
 
-    int prim_offset = leaf_prim_count * sample;
-    if (prim_offset == leaf_prim_count) {
-        prim_offset -= 1;
+    if (leaf.prim_count == 1) {
+        // Fast path is there is only one primitive in the leaf.
+        prim = m_primitives[leaf.primitives_offset];
+    } else {
+        prim = sample_leaf(si, importance_ratio, sample, m_nodes[offset]);;
     }
 
-    prim_offset += leaf_offset;
-    importance_ratio /= leaf_prim_count;
-
-    m_emitter_stats[prim_offset] += 1;
-    return m_primitives[prim_offset];
-
-//    return sample_leaf(si, importance_ratio, sample, m_nodes[offset]);
+    return prim;
 }
 
 MTS_VARIANT Float BVH<Float, Spectrum>::pdf_tree(const SurfaceInteraction3f &si, const Emitter *emitter, const ScalarIndex face_idx) {
@@ -315,12 +310,15 @@ MTS_VARIANT Float BVH<Float, Spectrum>::pdf_tree(const SurfaceInteraction3f &si,
     int current_offset = prim->leaf_offset;
     LinearBVHNode *current_node;
 
-
+    // While root is not reached
     while(current_offset != -1) {
         current_node = &m_nodes[current_offset];
 
         if (current_node->is_leaf()) {
-            pdf /= current_node->prim_count;
+            // Skip leaves that contain only one primitive (as pdf = 1)
+            if (current_node->prim_count != 1) {
+                pdf *= pdf_leaf(si, current_node, prim_idx - current_node->primitives_offset);
+            }
         } else {
             Float w_left, w_right;
             std::tie(w_left, w_right) = compute_children_weights(current_offset, si);
@@ -346,21 +344,46 @@ MTS_VARIANT Float BVH<Float, Spectrum>::pdf_tree(const SurfaceInteraction3f &si,
 }
 
 MTS_VARIANT typename BVH<Float, Spectrum>::BVHPrimitive*
-BVH<Float, Spectrum>::sample_leaf(const SurfaceInteraction3f &si, float &importance_ratio, const Float &sample_, const LinearBVHNode &leaf) const {
-    std::vector<IBVHEmitter*> emitters(leaf.prim_count);
-    for (ScalarIndex i = 0; i < leaf.prim_count; i++) {
-        emitters[i] = m_primitives[leaf.primitives_offset + i];
+BVH<Float, Spectrum>::sample_leaf(const SurfaceInteraction3f &si, float &importance_ratio, const Float &sample_, const LinearBVHNode &leaf) {
+    int prim_offset = 0;
+    if (m_uniform_leaf_sampling) {
+        int leaf_prim_count = leaf.prim_count;
+
+        prim_offset = leaf_prim_count * sample_;
+        if (prim_offset == leaf_prim_count) {
+            prim_offset -= 1;
+        }
+
+        prim_offset += leaf.primitives_offset;;
+        importance_ratio /= leaf_prim_count;
+
+    } else {
+        ScalarFloat* prim_weights = compute_bvh_emitters_weights(m_primitives, leaf.primitives_offset, leaf.prim_count, si);
+        DiscreteDistribution<Float> leaf_distrib(prim_weights, leaf.prim_count);
+
+        ScalarIndex offset;
+        Float leaf_prim_pdf;
+        std::tie(offset, leaf_prim_pdf) = leaf_distrib.sample_pmf(sample_);
+        importance_ratio *= leaf_prim_pdf;
+
+        prim_offset = leaf.primitives_offset + offset;
     }
 
-    ScalarFloat* prim_weights = compute_bvh_emitters_weights(emitters, leaf.prim_count, si);
-    DiscreteDistribution<Float> leaf_distrib(prim_weights, leaf.prim_count); // TODO: TRY ADD EPSILON // SINGLE THREADED?
+    m_emitter_stats[prim_offset] += 1;
+    return m_primitives[prim_offset];
+}
 
-    ScalarIndex offset;
-    Float leaf_prim_pdf;
-    std::tie(offset, leaf_prim_pdf) = leaf_distrib.sample_pmf(sample_);
-    importance_ratio /= leaf_prim_pdf;
+MTS_VARIANT Float BVH<Float, Spectrum>::pdf_leaf(const SurfaceInteraction3f &si, const LinearBVHNode *leaf, ScalarIndex prim_idx) const {
+    Float pdf;
+    if (m_uniform_leaf_sampling) {
+        pdf = 1.0f / leaf->prim_count;
+    } else {
+        ScalarFloat* prim_weights = compute_bvh_emitters_weights(m_primitives, leaf->primitives_offset, leaf->prim_count, si);
+        DiscreteDistribution<Float> leaf_distrib(prim_weights, leaf->prim_count);
+        pdf = leaf_distrib.eval_pmf_normalized(prim_idx);
+    }
 
-    return m_primitives[leaf.primitives_offset + offset];
+    return pdf;
 }
 
 MTS_VARIANT typename BVH<Float, Spectrum>::ScalarFloat*
