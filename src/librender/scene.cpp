@@ -104,6 +104,7 @@ MTS_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props) {
     // Light hierarchy related
     Properties bvh_props = Properties();
     bvh_props.set_bool("split_mesh", props.bool_("lighttree_split_mesh", true));
+    bvh_props.set_bool("uniform_leaf_sampling", props.bool_("lighttree_uniform_leaf_sampling", false));
     bvh_props.set_bool("visualization", props.bool_("lighttree_visualization", false));
     bvh_props.set_int("max_prims_in_node", props.int_("lighttree_max_prims_in_node", 1));
     bvh_props.set_string("split_metric", props.string("lighttree_split_metric", "saoh"));

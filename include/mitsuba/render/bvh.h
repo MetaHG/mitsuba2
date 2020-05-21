@@ -27,7 +27,7 @@ public:
     BVH(const Properties &props);
 
     BVH(host_vector<ref<Emitter>, Float> p, int max_prims_in_node, SplitMethod split_method,
-        ClusterImportanceMethod cluster_importance_method, bool visualize_volumes = false);
+        ClusterImportanceMethod cluster_importance_method, bool split_mesh, bool uniform_leaf_sampling, bool visualize_volumes = false);
 
     ~BVH();
 
@@ -361,6 +361,7 @@ private:
     SplitMethod m_split_method;
     ClusterImportanceMethod m_cluster_importance_method;
     bool m_split_mesh;
+    bool m_uniform_leaf_sampling;
     std::vector<BVHPrimitive*> m_primitives;
     std::unordered_map<const Emitter*, std::vector<ScalarIndex>> m_prim_index_map;
     LinearBVHNode *m_nodes = nullptr;

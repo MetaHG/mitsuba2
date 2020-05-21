@@ -11,6 +11,7 @@ NAMESPACE_BEGIN(mitsuba)
 
 MTS_VARIANT BVH<Float,Spectrum>::BVH(const Properties &props) {
     m_split_mesh = props.bool_("split_mesh", true);
+    m_uniform_leaf_sampling = props.bool_("uniform_leaf_sampling", false);
 
     const std::string split_metric = props.string("split_metric", "saoh");
     if (split_metric == "equal_counts") {
@@ -41,9 +42,11 @@ MTS_VARIANT BVH<Float,Spectrum>::BVH(const Properties &props) {
 }
 
 MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int max_prims_in_node,
-                                      SplitMethod split_method, ClusterImportanceMethod cluster_importance_method, bool visualize_volumes):
+                                      SplitMethod split_method, ClusterImportanceMethod cluster_importance_method,
+                                      bool split_mesh, bool uniform_leaf_sampling, bool visualize_volumes):
     m_max_prims_in_node(std::min(255, max_prims_in_node)), m_split_method(split_method),
-    m_cluster_importance_method(cluster_importance_method), m_visualize_volumes(visualize_volumes) {
+    m_cluster_importance_method(cluster_importance_method), m_split_mesh(split_mesh),
+    m_uniform_leaf_sampling(uniform_leaf_sampling), m_visualize_volumes(visualize_volumes) {
 
     Log(Info, "Building a SAOH BVH Light Hierarchy");
 
