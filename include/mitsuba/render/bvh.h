@@ -166,8 +166,8 @@ protected:
         }
 
         BVHPrimitive(Emitter *emitter) : emitter(emitter), leaf_offset(-1), is_triangle(false), face_id(0) {
-            prim_bbox = ScalarBoundingBox3f();
-            prim_cone = ScalarCone3f();
+            prim_bbox = ScalarBoundingBox3f::merge(ScalarBoundingBox3f(), emitter->bbox());
+            prim_cone = ScalarCone3f(emitter->cone());
         }
 
         BVHPrimitive(Emitter *emitter, ScalarIndex face_id, ScalarBoundingBox3f bbox, ScalarCone3f cone) : BVHPrimitive(emitter) {
@@ -184,19 +184,11 @@ protected:
 
         // Methods
         inline ScalarBoundingBox3f bbox() const override {
-            if (is_triangle) {
-                return prim_bbox;
-            }
-
-            return emitter->bbox();
+            return prim_bbox;
         }
 
         inline ScalarCone3f cone() const override {
-            if (is_triangle) {
-                return prim_cone;
-            }
-
-            return emitter->cone();
+            return prim_cone;
         }
 
         inline Spectrum intensity() const override {
