@@ -167,7 +167,7 @@ MTS_VARIANT Float BVH<Float, Spectrum>::pdf_emitter_direction(const SurfaceInter
     const Emitter *emitter = reinterpret_array<EmitterPtr>(ds.object);
     const Shape *shape = emitter->shape();
 
-    ScalarIndex face_idx = ds.prim_index;
+    ScalarIndex face_idx = m_split_mesh ? ds.prim_index : 0;
 
     Float emitter_pdf = 1.0f;
     if (shape->is_mesh() && m_split_mesh) {
