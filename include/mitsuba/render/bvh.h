@@ -35,6 +35,10 @@ public:
 
     void set_primitives(host_vector<ref<Emitter>, Float> emitters);
 
+    MTS_INLINE bool split_mesh() const {
+        return m_split_mesh;
+    }
+
     std::pair<DirectionSample3f, Spectrum> sample_emitter(const Float &tree_sample, const SurfaceInteraction3f &ref,
                                                           const Point2f &emitter_sample, const Mask active);
 

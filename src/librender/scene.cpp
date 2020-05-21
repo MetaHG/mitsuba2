@@ -235,7 +235,13 @@ Scene<Float, Spectrum>::sample_emitter_direction_custom(const SurfaceInteraction
     Spectrum spec;
 
     if (likely(!m_emitters.empty())) {
-        std::tie(ds, spec) = m_bvh->sample_emitter(tree_sample, ref, sample, active);
+        if (m_emitters.size() == 1 && !m_bvh->split_mesh()) {
+            // Fast path if there is only one emitter
+            std::tie(ds, spec) = m_emitters[0]->sample_direction(ref, sample, active);
+        } else {
+            std::tie(ds, spec) = m_bvh->sample_emitter(tree_sample, ref, sample, active);
+        }
+
         active &= neq(ds.pdf, 0.f);
 
         // Perform a visibility test if requested
@@ -268,7 +274,12 @@ Scene<Float, Spectrum>::pdf_emitter_direction_custom(const SurfaceInteraction3f 
     if (!m_bvh)
         return pdf_emitter_direction(ref, ds, active);
 
-    return m_bvh->pdf_emitter_direction(ref, ds, active);
+    if (m_emitters.size() == 1 && !m_bvh->split_mesh()) {
+        // Fast path if there is only one emitter
+        return m_emitters[0]->pdf_direction(ref, ds, active);
+    } else {
+        return m_bvh->pdf_emitter_direction(ref, ds, active);
+    }
 }
 
 MTS_VARIANT std::pair<typename Scene<Float, Spectrum>::DirectionSample3f, Spectrum>
