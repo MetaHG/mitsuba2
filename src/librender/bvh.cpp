@@ -392,7 +392,8 @@ BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::vector<BVHPrimitiv
     ScalarFloat* distances = new ScalarFloat[size];
 
     for (size_t i = 0; i < size; i++) {
-        weights[i] = compute_luminance(emitters[offset + i]->intensity());
+//        weights[i] = compute_luminance(emitters[offset + i]->intensity());
+        weights[i] = emitters[offset + i]->prim_luminance;
         distances[i] = ScalarFloat(1.0f);
     }
 
@@ -450,8 +451,10 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
     const LinearBVHNode &ln = m_nodes[offset + 1];
     const LinearBVHNode &rn = m_nodes[m_nodes[offset].second_child_offset];
 
-    Float l_weight = compute_luminance(ln.node_intensity);
-    Float r_weight = compute_luminance(rn.node_intensity);
+//    Float l_weight = compute_luminance(ln.node_intensity);
+//    Float r_weight = compute_luminance(rn.node_intensity);
+    Float l_weight = ln.node_luminance;
+    Float r_weight = rn.node_luminance;
 
     Float left_d = 1.0f;
     Float right_d = 1.0f;
@@ -749,7 +752,7 @@ MTS_VARIANT int BVH<Float, Spectrum>::flatten_bvh_tree(BVHNode *node, int *offse
     linear_node->node_bbox = node->bbox;
     // Store cosinus of angles for future computation optimizations (see "compute_cone_weight" function)
     linear_node->node_cone_cosine = ScalarCone3f(node->bcone.axis, cos(node->bcone.normal_angle), cos(node->bcone.emission_angle));
-    linear_node->node_intensity = node->intensity;
+    linear_node->node_luminance = compute_luminance(node->intensity);
     linear_node->parent_offset = parent_offset;
     int my_offset = (*offset)++;
 

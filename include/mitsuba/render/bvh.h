@@ -111,7 +111,7 @@ protected:
 
     struct IBVHEmitter {
         virtual ~IBVHEmitter() { }
-        virtual Spectrum intensity() const = 0;
+        virtual Float luminance() const = 0;
         virtual ScalarBoundingBox3f bbox() const = 0;
         virtual ScalarCone3f cone() const = 0;
     };
@@ -129,8 +129,8 @@ protected:
             return prim_count > 0;
         }
 
-        inline Spectrum intensity() const override {
-            return node_intensity;
+        inline Float luminance() const override {
+            return node_luminance;
         }
 
         inline ScalarBoundingBox3f bbox() const override {
@@ -150,7 +150,7 @@ protected:
         };
         uint16_t prim_count; // 0 -> inner node
         uint8_t axis;
-        Spectrum node_intensity;
+        Float node_luminance;
         ScalarCone3f node_cone_cosine;
         int parent_offset;
         uint8_t pad[1]; // Padding for memory/cache alignment
@@ -165,6 +165,7 @@ protected:
             leaf_offset = 0;
             is_triangle = false;
             face_id = 0;
+            prim_luminance = 0.0f;
             prim_bbox = ScalarBoundingBox3f();
             prim_cone = ScalarCone3f();
         }
@@ -172,6 +173,7 @@ protected:
         BVHPrimitive(Emitter *emitter) : emitter(emitter), leaf_offset(-1), is_triangle(false), face_id(0) {
             prim_bbox = ScalarBoundingBox3f::merge(ScalarBoundingBox3f(), emitter->bbox());
             prim_cone = ScalarCone3f(emitter->cone());
+            prim_luminance = compute_luminance(emitter->get_total_radiance());
         }
 
         BVHPrimitive(Emitter *emitter, ScalarIndex face_id, ScalarBoundingBox3f bbox, ScalarCone3f cone) : BVHPrimitive(emitter) {
@@ -179,6 +181,11 @@ protected:
             this->face_id = face_id;
             prim_bbox = bbox;
             prim_cone = cone;
+
+            const Shape *shape = emitter->shape();
+            const Mesh *mesh = static_cast<const Mesh*>(shape);
+            Float tri_area = mesh->face_area(face_id);
+            prim_luminance = compute_luminance(emitter->get_radiance() * tri_area);
         }
 
         // Destructor
@@ -195,7 +202,7 @@ protected:
             return prim_cone;
         }
 
-        inline Spectrum intensity() const override {
+        inline Spectrum intensity() const {
             if (is_triangle) {
                 const Shape *shape = emitter->shape();
                 const Mesh *mesh = static_cast<const Mesh*>(shape);
@@ -204,6 +211,10 @@ protected:
             }
 
             return emitter->get_total_radiance();
+        }
+
+        inline Float luminance() const override {
+            return prim_luminance;
         }
 
         inline std::pair<DirectionSample3f, Spectrum> sample_direction(const SurfaceInteraction3f &ref,
@@ -236,6 +247,7 @@ protected:
 
         bool is_triangle;
         ScalarIndex face_id;
+        Float prim_luminance;
         ScalarBoundingBox3f prim_bbox;
         union {
             ScalarCone3f prim_cone;
