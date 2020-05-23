@@ -13,15 +13,15 @@ MTS_VARIANT BVH<Float,Spectrum>::BVH(const Properties &props) {
     m_split_mesh = props.bool_("split_mesh", true);
     m_uniform_leaf_sampling = props.bool_("uniform_leaf_sampling", false);
 
-    const std::string split_metric = props.string("split_metric", "saoh");
-    if (split_metric == "equal_counts") {
-        m_split_method = SplitMethod::EqualCounts;
-    } else if (split_metric == "middle") {
-        m_split_method = SplitMethod::Middle;
-    } else if (split_metric == "sah") {
-        m_split_method = SplitMethod::SAH;
+    const std::string split_heuristic = props.string("split_heuristic", "saoh");
+    if (split_heuristic == "equal_counts") {
+        m_split_heuristic = SplitMethod::EqualCounts;
+    } else if (split_heuristic == "middle") {
+        m_split_heuristic = SplitMethod::Middle;
+    } else if (split_heuristic == "sah") {
+        m_split_heuristic = SplitMethod::SAH;
     } else {
-        m_split_method = SplitMethod::SAOH;
+        m_split_heuristic = SplitMethod::SAOH;
     }
 
     const std::string cluster_importance = props.string("cluster_importance", "orientation_estevez");
@@ -44,7 +44,7 @@ MTS_VARIANT BVH<Float,Spectrum>::BVH(const Properties &props) {
 MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int max_prims_in_node,
                                       SplitMethod split_method, ClusterImportanceMethod cluster_importance_method,
                                       bool split_mesh, bool uniform_leaf_sampling, bool visualize_volumes):
-    m_max_prims_in_node(std::min(255, max_prims_in_node)), m_split_method(split_method),
+    m_max_prims_in_node(std::min(255, max_prims_in_node)), m_split_heuristic(split_method),
     m_cluster_importance_method(cluster_importance_method), m_split_mesh(split_mesh),
     m_uniform_leaf_sampling(uniform_leaf_sampling), m_visualize_volumes(visualize_volumes) {
 
@@ -81,7 +81,7 @@ MTS_VARIANT void BVH<Float,Spectrum>::build() {
 
     std::vector<BVHPrimInfo> prim_info(m_primitives.size());
     for (size_t i = 0; i < m_primitives.size(); i++) {
-        switch (m_split_method) {
+        switch (m_split_heuristic) {
             case SplitMethod::SAOH: {
                 prim_info[i] = { i, m_primitives[i]->bbox(), m_primitives[i]->intensity(), m_primitives[i]->cone() };
                 break;
@@ -666,7 +666,7 @@ BVH<Float,Spectrum>::recursive_build(std::vector<BVHPrimInfo> &primitive_info,
             int mid = (start + end) / 2;
             int dim = centroid_bbox.major_axis();
 
-            switch (m_split_method) {
+            switch (m_split_heuristic) {
             case SplitMethod::Middle: {
                 Float p_mid = centroid_bbox.center()[dim];
                 BVHPrimInfo *mid_ptr = std::partition(&primitive_info[start],
@@ -692,7 +692,7 @@ BVH<Float,Spectrum>::recursive_build(std::vector<BVHPrimInfo> &primitive_info,
             case SplitMethod::SAH:
             case SplitMethod::SAOH:
             default: {
-                if (m_split_method != SplitMethod::SAOH && nb_prim <= 4) { //TODO: Define this threshold
+                if (m_split_heuristic != SplitMethod::SAOH && nb_prim <= 4) { //TODO: Define this threshold
                     mid = (start + end) / 2;
                     std::nth_element(&primitive_info[start], &primitive_info[mid], &primitive_info[end-1] + 1,
                             [dim](const BVHPrimInfo &a, const BVHPrimInfo &b) {
@@ -709,7 +709,7 @@ BVH<Float,Spectrum>::recursive_build(std::vector<BVHPrimInfo> &primitive_info,
                                 nb_buckets, dim, min_cost_split_bucket, min_cost);
 
                 Float leaf_cost;
-                if (m_split_method == SplitMethod::SAOH) {
+                if (m_split_heuristic == SplitMethod::SAOH) {
                     leaf_cost = compute_luminance(node_intensity);
                 } else {
                     leaf_cost = nb_prim;
@@ -796,7 +796,7 @@ MTS_VARIANT void BVH<Float, Spectrum>::find_split(std::vector<BVHPrimInfo> &prim
             buckets[b].count++;
             buckets[b].bbox.expand(primitive_info[i].bbox);
 
-            if (m_split_method == SplitMethod::SAOH) {
+            if (m_split_heuristic == SplitMethod::SAOH) {
                 buckets[b].intensity += primitive_info[i].intensity;
                 buckets[b].cone = ScalarCone3f::merge(buckets[b].cone, primitive_info[i].cone);
             }
@@ -814,7 +814,7 @@ MTS_VARIANT void BVH<Float, Spectrum>::find_split(std::vector<BVHPrimInfo> &prim
                 b0.expand(buckets[j].bbox);
                 count0 += buckets[j].count;
 
-                if (m_split_method == SplitMethod::SAOH) {
+                if (m_split_heuristic == SplitMethod::SAOH) {
                     i0 += buckets[j].intensity;
                     c0 = ScalarCone3f::merge(c0, buckets[j].cone);
                 }
@@ -824,14 +824,14 @@ MTS_VARIANT void BVH<Float, Spectrum>::find_split(std::vector<BVHPrimInfo> &prim
                 b1.expand(buckets[j].bbox);
                 count1 += buckets[j].count;
 
-                if (m_split_method == SplitMethod::SAOH) {
+                if (m_split_heuristic == SplitMethod::SAOH) {
                     i1 += buckets[j].intensity;
                     c1 = ScalarCone3f::merge(c1, buckets[j].cone);
                 }
             }
 
             // TODO: CLEAN THIS METHOD
-            if (m_split_method == SplitMethod::SAOH) {
+            if (m_split_heuristic == SplitMethod::SAOH) {
                 if (node_bbox.surface_area() < std::numeric_limits<float>::epsilon()) {
                     //cost[i] = squared_norm(node_bbox.extents()) * (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
                     cost[i] = (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();

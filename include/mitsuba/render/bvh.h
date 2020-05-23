@@ -372,7 +372,7 @@ private:
 
 private:
     int m_max_prims_in_node;
-    SplitMethod m_split_method;
+    SplitMethod m_split_heuristic;
     ClusterImportanceMethod m_cluster_importance_method;
     bool m_split_mesh;
     bool m_uniform_leaf_sampling;

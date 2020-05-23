@@ -107,7 +107,7 @@ MTS_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props) {
     bvh_props.set_bool("uniform_leaf_sampling", props.bool_("lighttree_uniform_leaf_sampling", false));
     bvh_props.set_bool("visualization", props.bool_("lighttree_visualization", false));
     bvh_props.set_int("max_prims_in_node", props.int_("lighttree_max_prims_in_node", 1));
-    bvh_props.set_string("split_metric", props.string("lighttree_split_metric", "saoh"));
+    bvh_props.set_string("split_heuristic", props.string("lighttree_split_heuristic", "saoh"));
     bvh_props.set_string("cluster_importance", props.string("lighttree_cluster_importance", "orientation_estevez"));
 //        std::cout << props.as_string("lighttree_split_metric") << std::endl;
     if (props.bool_("lighttree", true)) {
