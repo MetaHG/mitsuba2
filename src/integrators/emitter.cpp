@@ -13,7 +13,7 @@ template <typename Float, typename Spectrum>
 class EmitterIntegrator : public MonteCarloIntegrator<Float, Spectrum> {
 public:
     MTS_IMPORT_BASE(MonteCarloIntegrator, m_max_depth, m_rr_depth)
-    MTS_IMPORT_TYPES(Scene, Sampler, Emitter, EmitterPtr, BSDF, BSDFPtr)
+    MTS_IMPORT_TYPES(Scene, Sampler, Medium, Emitter, EmitterPtr, BSDF, BSDFPtr)
 
 
     EmitterIntegrator(const Properties &props) : Base(props) { }
@@ -21,7 +21,8 @@ public:
     std::pair<Spectrum, Mask> sample(const Scene *scene,
                                      Sampler * sampler,
                                      const RayDifferential3f &ray,
-                                     Float */*aovs*/,
+                                     const Medium * /* medium */,
+                                     Float * /* aovs */,
                                      Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
 
@@ -35,7 +36,7 @@ public:
          // --------------------- Emitter sampling ---------------------
 
         auto [ds, emitter_val] = scene->sample_emitter_direction_pure(
-         si, sampler->next_3d(active), true, active);
+         si, sampler->next_2d(active), sampler->next_1d(active), true, active);
         Mask active_e = active && neq(ds.pdf, 0.f);
 
         result[active_e] += emitter_val;

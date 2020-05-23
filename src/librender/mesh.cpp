@@ -446,7 +446,7 @@ Mesh<Float, Spectrum>::face(const PositionSample3f &ps, Mask active) const {
     throw std::runtime_error("Mesh: face(point): Point is not on mesh");
 }
 
-MTS_VARIANT Float Mesh<Float, Spectrum>::pdf_position(const PositionSample3f &, Mask active) const {
+MTS_VARIANT Float Mesh<Float, Spectrum>::pdf_position(const PositionSample3f &, Mask) const {
     area_distr_ensure();
     return m_area_distr.normalization();
 }

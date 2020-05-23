@@ -170,20 +170,20 @@ Scene<Float, Spectrum>::ray_test(const Ray3f &ray, Mask active) const {
 }
 
 MTS_VARIANT std::pair<typename Scene<Float, Spectrum>::DirectionSample3f, Spectrum>
-Scene<Float, Spectrum>::sample_emitter_direction_pure(const SurfaceInteraction3f &ref, const Point3f &sample_,
-                                                 bool /*test_visibility*/, Mask active) const {
+Scene<Float, Spectrum>::sample_emitter_direction_pure(const SurfaceInteraction3f &ref, const Point2f &sample_,
+                                                 const Float &light_sample_, bool /*test_visibility*/, Mask active) const {
     MTS_MASKED_FUNCTION(ProfilerPhase::SampleEmitterDirection, active);
 
     using EmitterPtr = replace_scalar_t<Float, Emitter*>;
 
-    Point2f sample(sample_.x(), sample_.y());
-    Float tree_sample(sample_.z());
+    Point2f sample(sample_);
+    Float light_sample(light_sample_);
     DirectionSample3f ds;
     Spectrum spec;
 
     if (likely(!m_emitters.empty())) {
         if (m_bvh) {
-            std::tie(ds, spec) = m_bvh->sample_emitter_pure(tree_sample, ref, sample, active);
+            std::tie(ds, spec) = m_bvh->sample_emitter_pure(light_sample, ref, sample, active);
         } else {
             ScalarFloat emitter_pdf = 1.f / m_emitters.size();
 
@@ -220,18 +220,19 @@ Scene<Float, Spectrum>::pdf_emitter_direction_pure(const SurfaceInteraction3f &r
 }
 
 MTS_VARIANT std::pair<typename Scene<Float, Spectrum>::DirectionSample3f, Spectrum>
-Scene<Float, Spectrum>::sample_emitter_direction_custom(const SurfaceInteraction3f &ref, const Point3f &sample_,
-                                                 bool test_visibility, Mask active) const {
+Scene<Float, Spectrum>::sample_emitter_direction_custom(const SurfaceInteraction3f &ref, const Point2f &sample_,
+                                                 const Float &light_sample_, bool test_visibility, Mask active) const {
     MTS_MASKED_FUNCTION(ProfilerPhase::SampleEmitterDirection, active);
 
     using EmitterPtr = replace_scalar_t<Float, Emitter*>;
 
+    Point2f sample(sample_);
+    Float light_sample(light_sample_);
+
     // If no light hierarchy is present, switch back to reference build
     if (!m_bvh)
-        return sample_emitter_direction(ref, sample_, test_visibility, active);
+        return sample_emitter_direction(ref, sample, test_visibility, active);
 
-    Point2f sample(sample_.x(), sample_.y());
-    Float tree_sample(sample_.z());
     DirectionSample3f ds;
     Spectrum spec;
 
@@ -240,7 +241,7 @@ Scene<Float, Spectrum>::sample_emitter_direction_custom(const SurfaceInteraction
             // Fast path if there is only one emitter
             std::tie(ds, spec) = m_emitters[0]->sample_direction(ref, sample, active);
         } else {
-            std::tie(ds, spec) = m_bvh->sample_emitter(tree_sample, ref, sample, active);
+            std::tie(ds, spec) = m_bvh->sample_emitter(light_sample, ref, sample, active);
         }
 
         active &= neq(ds.pdf, 0.f);
@@ -284,7 +285,7 @@ Scene<Float, Spectrum>::pdf_emitter_direction_custom(const SurfaceInteraction3f 
 }
 
 MTS_VARIANT std::pair<typename Scene<Float, Spectrum>::DirectionSample3f, Spectrum>
-Scene<Float, Spectrum>::sample_emitter_direction(const Interaction3f &ref, const Point3f &sample_,
+Scene<Float, Spectrum>::sample_emitter_direction(const Interaction3f &ref, const Point2f &sample_,
                                                  bool test_visibility, Mask active) const {
     MTS_MASKED_FUNCTION(ProfilerPhase::SampleEmitterDirection, active);
 

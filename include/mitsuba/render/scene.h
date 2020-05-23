@@ -95,19 +95,21 @@ public:
      */
     std::pair<DirectionSample3f, Spectrum>
     sample_emitter_direction(const Interaction3f &ref,
-                             const Point3f &sample,
+                             const Point2f &sample,
                              bool test_visibility = true,
                              Mask active = true) const;
 
     std::pair<DirectionSample3f, Spectrum>
     sample_emitter_direction_custom(const SurfaceInteraction3f &ref,
-                             const Point3f &sample,
+                             const Point2f &sample,
+                             const Float &light_sample,
                              bool test_visibility = true,
                              Mask active = true) const;
 
     std::pair<DirectionSample3f, Spectrum>
     sample_emitter_direction_pure(const SurfaceInteraction3f &ref,
-                             const Point3f &sample,
+                             const Point2f &sample,
+                             const Float &light_sample,
                              bool test_visibility = true,
                              Mask active = true) const;
 
