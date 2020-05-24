@@ -55,6 +55,9 @@ public:
 
     void to_obj();
 
+    /// Return a human-readable string representation of the bvh.
+    virtual std::string to_string() const override;
+
     MTS_DECLARE_CLASS()
 
 protected:
@@ -361,14 +364,24 @@ private:
         return oss.str();
     }
 
-    struct HashPair {
-        template<class T1, class T2>
-        size_t operator() (const std::pair<T1, T2> &p) const {
-            auto hash1 = std::hash<T1>{}(p.first);
-            auto hash2 = std::hash<T2>{}(p.second);
-            return hash1 ^ (hash2 << 1);
+    std::string split_heuristic_to_string(const SplitMethod &m) const {
+        switch (m) {
+            case SplitMethod::SAOH: return "SAOH"; break;
+            case SplitMethod::SAH: return "SAH"; break;
+            case SplitMethod::EqualCounts: return "EqualCounts"; break;
+            case SplitMethod::Middle: return "Middle"; break;
         }
-    };
+    }
+
+    std::string cluster_importance_to_string(const ClusterImportanceMethod &m) const {
+        switch (m) {
+            case ClusterImportanceMethod::BASE_ESTEVEZ_PAPER: return "Base Estevez"; break;
+            case ClusterImportanceMethod::BASE_STOCHASTIC_YUKSEL_PAPER: return "Base Yuksel"; break;
+            case ClusterImportanceMethod::ORIENTATION_ESTEVEZ_PAPER: return "Orientation Estevez"; break;
+            case ClusterImportanceMethod::ORIENTATION_STOCHASTIC_YUKSEL_PAPER: return "Orientation Yuksel"; break;
+            case ClusterImportanceMethod::POWER: return "Power"; break;
+        }
+    }
 
 private:
     int m_max_prims_in_node;

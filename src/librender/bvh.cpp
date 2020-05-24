@@ -966,6 +966,21 @@ MTS_VARIANT void BVH<Float, Spectrum>::cone_to_obj(std::string filename, ScalarP
     ofs.close();
 }
 
+MTS_VARIANT std::string BVH<Float, Spectrum>::to_string() const {
+    std::ostringstream oss;
+    oss << "BVH[" << std::endl
+        << "  split_heuristic: " << split_heuristic_to_string(m_split_heuristic) << std::endl
+        << "  cluster_importance: " << cluster_importance_to_string(m_cluster_importance_method) << std::endl
+        << "  split_mesh: " << std::boolalpha << m_split_mesh << std::noboolalpha << std::endl
+        << "  uniform_leaf_sampling: " << std::boolalpha << m_uniform_leaf_sampling << std::noboolalpha << std::endl
+        << "  max_prims_in_node: " << m_max_prims_in_node << std::endl
+        << "  primitives_count: " << m_primitives.size() << std::endl
+        << "  leaf_count: " << m_leaf_count << std::endl
+        << "  total_nodes: " << m_total_nodes << std::endl
+        << "]" << std::endl;
+    return oss.str();
+}
+
 
 MTS_IMPLEMENT_CLASS_VARIANT(BVH, Object, "bvh")
 MTS_INSTANTIATE_CLASS(BVH)
