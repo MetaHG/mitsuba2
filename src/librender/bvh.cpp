@@ -79,16 +79,7 @@ MTS_VARIANT void BVH<Float,Spectrum>::build() {
 
     std::vector<BVHPrimInfo> prim_info(m_primitives.size());
     for (size_t i = 0; i < m_primitives.size(); i++) {
-        switch (m_split_heuristic) {
-            case SplitMethod::SAOH: {
-                prim_info[i] = { i, m_primitives[i]->bbox(), m_primitives[i]->intensity(), m_primitives[i]->cone() };
-                break;
-            }
-            default: {
-                prim_info[i] = { i, m_primitives[i]->bbox() };
-                break;
-            }
-        }
+        prim_info[i] = { i, m_primitives[i]->bbox(), m_primitives[i]->intensity(), m_primitives[i]->cone() };
     }
 
     m_leaf_count = 0;
