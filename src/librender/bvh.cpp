@@ -48,8 +48,6 @@ MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int ma
     m_cluster_importance_method(cluster_importance_method), m_split_mesh(split_mesh),
     m_uniform_leaf_sampling(uniform_leaf_sampling), m_visualize_volumes(visualize_volumes) {
 
-    Log(Info, "Building a SAOH BVH Light Hierarchy");
-
     set_primitives(p);
     build();
 }
@@ -73,7 +71,7 @@ MTS_VARIANT BVH<Float, Spectrum>::~BVH() {
 }
 
 MTS_VARIANT void BVH<Float,Spectrum>::build() {
-    Log(Info, "Building a SAOH BVH Light Hierarchy");
+    Log(Info, "Building a BVH Light Hierarchy");
 
     if (m_primitives.size() == 0) {
         return;
@@ -112,10 +110,7 @@ MTS_VARIANT void BVH<Float,Spectrum>::build() {
     flatten_bvh_tree(root, &offset, -1);
 
     Log(Info, "Finished.");
-    Log(Info, "BVH Light Hierarchy statistics:\n"
-              "  Primitive count: %s,\n"
-              "  Leaf count: %s,\n"
-              "  Total nodes: %s", m_primitives.size(), m_leaf_count, m_total_nodes);
+    Log(Info, "%s", this->to_string());
 }
 
 MTS_VARIANT void BVH<Float, Spectrum>::set_primitives(host_vector<ref<Emitter>, Float> emitters) {
