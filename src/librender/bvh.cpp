@@ -374,9 +374,11 @@ MTS_VARIANT Float BVH<Float, Spectrum>::pdf_leaf(const SurfaceInteraction3f &si,
     return pdf;
 }
 
+//TODO: Refactor for optimization
 MTS_VARIANT void BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::vector<BVHPrimitive*> &emitters, size_t offset, const SurfaceInteraction3f &ref,
                                                                     ScalarFloat weights[], size_t size) const {
     ScalarFloat distances[size];
+    bool account_for_distance = true;
 
     for (size_t i = 0; i < size; i++) {
 //        weights[i] = compute_luminance(emitters[offset + i]->intensity());
@@ -386,7 +388,7 @@ MTS_VARIANT void BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::v
 
     switch (m_cluster_importance_method) {
         case ClusterImportanceMethod::POWER: {
-            return;
+            account_for_distance = false;
         }
         break;
 
@@ -402,7 +404,8 @@ MTS_VARIANT void BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::v
                 distances[i] = emitters[offset + i]->bbox().squared_distance(ref.p);
 
                 if (distances[i] <= YUKSEL_DISTANCE_RATIO * squared_norm(emitters[offset + i]->bbox().extents())) {
-                    return;
+                    account_for_distance = false;
+                    break;
                 }
             }
         }
@@ -428,7 +431,7 @@ MTS_VARIANT void BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::v
 //        weights[i] /= distances[i];
 
         // Epsilon is added as area_distribution_1d does not handle full zero weights.
-        weights[i] = (weights[i] + std::numeric_limits<Float>::epsilon()) / distances[i];
+        weights[i] = (weights[i] + std::numeric_limits<Float>::epsilon()) / (account_for_distance ? distances[i] : 1.0f);
     }
 }
 
