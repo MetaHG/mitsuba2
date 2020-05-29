@@ -454,8 +454,8 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
         break;
 
         case ClusterImportanceMethod::ORIENTATION_STOCHASTIC_YUKSEL_PAPER: {
-            l_weight *= compute_cone_weight_old(ln.node_bbox, ln.node_cone_cosine, ref);
-            r_weight *= compute_cone_weight_old(rn.node_bbox, rn.node_cone_cosine, ref);
+            l_weight *= compute_cone_weight(ln.node_bbox, ln.node_cone_cosine, ref);
+            r_weight *= compute_cone_weight(rn.node_bbox, rn.node_cone_cosine, ref);
         }
 
         case ClusterImportanceMethod::BASE_STOCHASTIC_YUKSEL_PAPER: {
