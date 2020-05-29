@@ -344,7 +344,8 @@ BVH<Float, Spectrum>::sample_leaf(const SurfaceInteraction3f &si, float &importa
         importance_ratio /= leaf_prim_count;
 
     } else {
-        ScalarFloat* prim_weights = compute_bvh_emitters_weights(m_primitives, leaf.primitives_offset, leaf.prim_count, si);
+        ScalarFloat prim_weights[leaf.prim_count];
+        compute_bvh_emitters_weights(m_primitives, leaf.primitives_offset, si, prim_weights, leaf.prim_count);
         DiscreteDistribution<Float> leaf_distrib(prim_weights, leaf.prim_count);
 
         ScalarIndex offset;
@@ -364,7 +365,8 @@ MTS_VARIANT Float BVH<Float, Spectrum>::pdf_leaf(const SurfaceInteraction3f &si,
     if (m_uniform_leaf_sampling) {
         pdf = 1.0f / leaf->prim_count;
     } else {
-        ScalarFloat* prim_weights = compute_bvh_emitters_weights(m_primitives, leaf->primitives_offset, leaf->prim_count, si);
+        ScalarFloat prim_weights[leaf->prim_count];
+        compute_bvh_emitters_weights(m_primitives, leaf->primitives_offset, si, prim_weights, leaf->prim_count);
         DiscreteDistribution<Float> leaf_distrib(prim_weights, leaf->prim_count);
         pdf = leaf_distrib.eval_pmf_normalized(prim_idx);
     }
@@ -372,10 +374,9 @@ MTS_VARIANT Float BVH<Float, Spectrum>::pdf_leaf(const SurfaceInteraction3f &si,
     return pdf;
 }
 
-MTS_VARIANT typename BVH<Float, Spectrum>::ScalarFloat*
-BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::vector<BVHPrimitive*> &emitters, size_t offset, size_t size, const SurfaceInteraction3f &ref) const {
-    ScalarFloat* weights = new ScalarFloat[size];
-    ScalarFloat* distances = new ScalarFloat[size];
+MTS_VARIANT void BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::vector<BVHPrimitive*> &emitters, size_t offset, const SurfaceInteraction3f &ref,
+                                                                    ScalarFloat weights[], size_t size) const {
+    ScalarFloat distances[size];
 
     for (size_t i = 0; i < size; i++) {
 //        weights[i] = compute_luminance(emitters[offset + i]->intensity());
@@ -385,7 +386,7 @@ BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::vector<BVHPrimitiv
 
     switch (m_cluster_importance_method) {
         case ClusterImportanceMethod::POWER: {
-            return weights;
+            return;
         }
         break;
 
@@ -401,7 +402,7 @@ BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::vector<BVHPrimitiv
                 distances[i] = emitters[offset + i]->bbox().squared_distance(ref.p);
 
                 if (distances[i] <= YUKSEL_DISTANCE_RATIO * squared_norm(emitters[offset + i]->bbox().extents())) {
-                    return weights;
+                    return;
                 }
             }
         }
@@ -429,8 +430,6 @@ BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::vector<BVHPrimitiv
         // Epsilon is added as area_distribution_1d does not handle full zero weights.
         weights[i] = (weights[i] + std::numeric_limits<Float>::epsilon()) / distances[i];
     }
-
-    return weights;
 }
 
 MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weights(int offset, const SurfaceInteraction3f &ref) {

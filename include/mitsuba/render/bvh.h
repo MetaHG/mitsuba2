@@ -269,7 +269,8 @@ protected:
 
     std::pair<Float, Float> compute_children_weights(int offset, const SurfaceInteraction3f &ref);
 
-    ScalarFloat* compute_bvh_emitters_weights(const std::vector<BVHPrimitive*> &emitters, size_t offset, size_t size, const SurfaceInteraction3f &ref) const;
+    void compute_bvh_emitters_weights(const std::vector<BVHPrimitive*> &emitters, size_t offset, const SurfaceInteraction3f &ref,
+                                      ScalarFloat weights[], size_t size) const;
 
     BVHNode* recursive_build(std::vector<BVHPrimInfo> &primitive_info,
                              int start,
