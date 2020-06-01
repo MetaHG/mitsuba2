@@ -53,6 +53,10 @@ MTS_VARIANT BVH<Float, Spectrum>::BVH(host_vector<ref<Emitter>, Float> p, int ma
 }
 
 MTS_VARIANT BVH<Float, Spectrum>::~BVH() {
+    if (m_primitives.size() == 0) {
+        return;
+    }
+
     // TODO: Clean this
     auto b = m_emitter_stats.begin();
     auto e = m_emitter_stats.end();
