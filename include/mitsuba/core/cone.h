@@ -22,15 +22,15 @@ template <typename Float_, typename Point_> struct Cone {
     Cone(const Cone &c): axis(c.axis), normal_angle(c.normal_angle), emission_angle(c.emission_angle) { }
 
     Scalar surface_area() {
-        Scalar total_angle = min(normal_angle + emission_angle, M_PIf32);
+        Scalar total_angle = min(normal_angle + emission_angle, math::Pi<Float>);
         Scalar cos_n_angle = cos(normal_angle);
         Scalar sin_n_angle = sin(normal_angle);
 
-        return 2 * M_PIf32 * (1.0f - cos_n_angle)
-                + M_PI_2f32 * (2 * total_angle * sin_n_angle
-                            - cos(normal_angle - 2 * total_angle)
-                            - 2 * normal_angle * sin_n_angle
-                            + cos_n_angle);
+        return 2 * math::Pi<Float> * (1.0f - cos_n_angle)
+                + 0.5f * math::Pi<Float> * (2 * total_angle * sin_n_angle
+                                            - cos(normal_angle - 2 * total_angle)
+                                            - 2 * normal_angle * sin_n_angle
+                                            + cos_n_angle);
     }
 
     static Cone merge(const Cone &c1, const Cone &c2) {
@@ -50,15 +50,15 @@ template <typename Float_, typename Point_> struct Cone {
         Scalar e_angle = max(c1.emission_angle, c2.emission_angle);
 
         if (min(diff_angle + c2.normal_angle, math::Pi<Float>) <= c1.normal_angle + std::numeric_limits<float>::epsilon()) {
-            // std::cout << "Cone::Merge: Bounds of c1 already covers c2." << std::endl;
+//             std::cout << "Cone::Merge: Bounds of c1 already covers c2." << std::endl;
             return { c1.axis, c1.normal_angle, e_angle }; // Bounds of c1 already covers c2
         }
 
         Scalar n_angle = (c1.normal_angle + diff_angle + c2.normal_angle) / 2.0f;
 
-        if (M_PIf32 <= n_angle) {
-            // std::cout << "Cone::Merge: Cone covers the sphere." << std::endl;
-            return { c1.axis, M_PI, e_angle }; // Cone covers the sphere
+        if (math::Pi<Float> <= n_angle) {
+//             std::cout << "Cone::Merge: Cone covers the sphere." << std::endl;
+            return { c1.axis, math::Pi<Float>, e_angle }; // Cone covers the sphere
         }
 
         Scalar n_diff_angle = n_angle - c1.normal_angle;
