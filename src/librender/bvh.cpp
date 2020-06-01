@@ -721,6 +721,17 @@ BVH<Float,Spectrum>::recursive_build(std::vector<BVHPrimInfo> &primitive_info,
                     });
 
                     mid = p_mid - &primitive_info[0];
+
+                    // Edge case where all the split at buckets gives the same cost
+                    if (mid == start || mid == end) {
+                        // Fallback to equal counts split along major axis.
+                        dim = centroid_bbox.major_axis();
+                        mid = (start + end) / 2;
+                        std::nth_element(&primitive_info[start], &primitive_info[mid], &primitive_info[end-1] + 1,
+                                [dim](const BVHPrimInfo &a, const BVHPrimInfo &b) {
+                            return a.centroid[dim] < b.centroid[dim];
+                        });
+                    }
                 } else {
                     node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox, node_intensity, node_cone);
                     if (m_visualize_volumes) {
