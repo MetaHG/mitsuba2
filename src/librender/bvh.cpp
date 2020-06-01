@@ -975,6 +975,7 @@ MTS_VARIANT std::string BVH<Float, Spectrum>::to_string() const {
         << "  split_mesh: " << std::boolalpha << m_split_mesh << std::noboolalpha << std::endl
         << "  uniform_leaf_sampling: " << std::boolalpha << m_uniform_leaf_sampling << std::noboolalpha << std::endl
         << "  max_prims_in_node: " << m_max_prims_in_node << std::endl
+        << "  number of emitters: " << m_prim_index_map.size() << std::endl
         << "  primitives_count: " << m_primitives.size() << std::endl
         << "  leaf_count: " << m_leaf_count << std::endl
         << "  total_nodes: " << m_total_nodes << std::endl
