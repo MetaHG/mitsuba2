@@ -33,6 +33,23 @@ template <typename Float_, typename Point_> struct Cone {
                                             + cos_n_angle);
     }
 
+    static bool covered(const Cone &c1, const Cone &c2) {
+        if (!c1.valid() || !c2.valid()) {
+            if (!c1.valid()) {
+                return true;
+            }
+
+            return true;
+        }
+
+        if (c2.normal_angle > c1.normal_angle) {
+            return covered(c2, c1);
+        }
+
+        Scalar diff_angle = enoki::unit_angle(c1.axis, c2.axis);
+        return min(diff_angle + c2.normal_angle, math::Pi<Float>) <= c1.normal_angle + std::numeric_limits<float>::epsilon();
+    }
+
     static Cone merge(const Cone &c1, const Cone &c2) {
         if (!c1.valid() || !c2.valid()) {
             if (!c1.valid()) {
