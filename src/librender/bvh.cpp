@@ -644,16 +644,18 @@ BVH<Float,Spectrum>::recursive_build(std::vector<BVHPrimInfo> &primitive_info,
         node_cone = ScalarCone3f::merge(node_cone, primitive_info[i].cone);
     }
 
-    if (m_visualize_volumes) {
-        save_to_obj(node_name, node_bbox, node_cone);
-    }
-
     int nb_prim = end - start;
     if (nb_prim == 1) {
         node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox, node_intensity, node_cone);
+        if (m_visualize_volumes) {
+            save_to_obj(node_name, node->bbox, node->bcone);
+        }
     } else {
         if (all(eq(centroid_bbox.min, centroid_bbox.max))) {
             node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox, node_intensity, node_cone);
+            if (m_visualize_volumes) {
+                save_to_obj(node_name, node->bbox, node->bcone);
+            }
         } else {
             int mid = (start + end) / 2;
             int dim = centroid_bbox.major_axis();
@@ -721,6 +723,9 @@ BVH<Float,Spectrum>::recursive_build(std::vector<BVHPrimInfo> &primitive_info,
                     mid = p_mid - &primitive_info[0];
                 } else {
                     node = create_leaf(primitive_info, start, end, ordered_prims, node_bbox, node_intensity, node_cone);
+                    if (m_visualize_volumes) {
+                        save_to_obj(node_name, node->bbox, node->bcone);
+                    }
                     return node;
                 }
 
@@ -732,6 +737,10 @@ BVH<Float,Spectrum>::recursive_build(std::vector<BVHPrimInfo> &primitive_info,
             node->init_inner(dim,
                              recursive_build(primitive_info, start, mid, total_nodes, ordered_prims, node_name + "l"),
                              recursive_build(primitive_info, mid, end, total_nodes, ordered_prims, node_name + "r"));
+
+            if (m_visualize_volumes) {
+                save_to_obj(node_name, node->bbox, node->bcone);
+            }
         }
     }
 
