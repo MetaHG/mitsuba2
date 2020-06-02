@@ -842,14 +842,23 @@ MTS_VARIANT void BVH<Float, Spectrum>::find_split(std::vector<BVHPrimInfo> &prim
                 }
             }
 
+            Float b0_surface_area = 0;
+            if (b0.valid()) {
+                b0_surface_area = b0.surface_area();
+            }
+
+            Float b1_surface_area = 0;
+            if (b1.valid()) {
+                b1_surface_area = b1.surface_area();
+            }
             // TODO: CLEAN THIS METHOD
             if (m_split_heuristic == SplitMethod::SAOH) {
                 if (node_bbox.surface_area() < std::numeric_limits<float>::epsilon()) {
                     //cost[i] = squared_norm(node_bbox.extents()) * (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
                     cost[i] = (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
                 } else {
-                    cost[i] = (compute_luminance(i0) * b0.surface_area() * c0.surface_area() // TODO: Need to add regularizer from paper?
-                               + compute_luminance(i1) * b1.surface_area() * c1.surface_area())
+                    cost[i] = (compute_luminance(i0) * b0_surface_area * c0.surface_area() // TODO: Need to add regularizer from paper?
+                               + compute_luminance(i1) * b1_surface_area * c1.surface_area())
                             / (node_bbox.surface_area() * node_cone.surface_area());
 
 //                            cost[i] = (compute_luminance(i0) * squared_norm(b0.extents()) * c0.surface_area()
@@ -857,8 +866,8 @@ MTS_VARIANT void BVH<Float, Spectrum>::find_split(std::vector<BVHPrimInfo> &prim
                 }
             } else {
                 // m_split_method == SplitMethod::SAH
-                cost[i] = 0.125f + (count0 * b0.surface_area() + // TODO: Define this cost
-                                    count1 * b1.surface_area()) / node_bbox.surface_area();
+                cost[i] = 0.125f + (count0 * b0_surface_area + // TODO: Define this cost
+                                    count1 * b1_surface_area) / node_bbox.surface_area();
             }
 
         }
