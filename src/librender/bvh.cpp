@@ -792,6 +792,9 @@ MTS_VARIANT void BVH<Float, Spectrum>::find_split(std::vector<BVHPrimInfo> &prim
                 ScalarBoundingBox3f &centroid_bbox, ScalarBoundingBox3f &node_bbox, ScalarCone3f &node_cone,
                 int nb_buckets, int &split_dim, int &split_bucket, Float &min_cost) {
 
+    int node_major_axis_dim = node_bbox.major_axis();
+    Float major_axis_extents_norm = node_bbox.max[node_major_axis_dim] - node_bbox.min[node_major_axis_dim];
+
     split_dim = centroid_bbox.major_axis();
     split_bucket = 0;
     min_cost = std::numeric_limits<Float>::max();
@@ -864,6 +867,8 @@ MTS_VARIANT void BVH<Float, Spectrum>::find_split(std::vector<BVHPrimInfo> &prim
 //                            cost[i] = (compute_luminance(i0) * squared_norm(b0.extents()) * c0.surface_area()
 //                                       + compute_luminance(i1) * squared_norm(b1.extents() * c1.surface_area()));
                 }
+                // Split dimension factor: favorise split on large axis.
+                cost[i] *= major_axis_extents_norm / (node_bbox.max[dim] - node_bbox.min[dim]);
             } else {
                 // m_split_method == SplitMethod::SAH
                 cost[i] = 0.125f + (count0 * b0_surface_area + // TODO: Define this cost
