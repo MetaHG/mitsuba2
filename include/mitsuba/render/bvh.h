@@ -372,6 +372,8 @@ private:
             case SplitMethod::EqualCounts: return "EqualCounts"; break;
             case SplitMethod::Middle: return "Middle"; break;
         }
+
+        Throw("Light hierarchy BVH: Unknown split heuristic");
     }
 
     std::string cluster_importance_to_string(const ClusterImportanceMethod &m) const {
@@ -382,6 +384,8 @@ private:
             case ClusterImportanceMethod::ORIENTATION_STOCHASTIC_YUKSEL_PAPER: return "Orientation Yuksel"; break;
             case ClusterImportanceMethod::POWER: return "Power"; break;
         }
+
+        Throw("Light hierarchy BVH: Unknown cluster importance");
     }
 
 private:
