@@ -1,6 +1,7 @@
 #include <mitsuba/render/bvh.h>
 #include <mitsuba/render/mesh.h>
 #include <mitsuba/core/distr_1d.h>
+#include <filesystem>
 
 NAMESPACE_BEGIN(mitsuba)
 
