@@ -958,7 +958,7 @@ MTS_VARIANT void BVH<Float, Spectrum>::cone_to_obj(std::string filename, ScalarP
     Float scale_factor = tan(cone.normal_angle);
 
     float cone_scale_factor = CONE_SCALE_FACTOR;
-    if (cone.normal_angle < M_PI_2f32 - std::numeric_limits<float>::epsilon()) {
+    if (cone.normal_angle < 0.5f * math::Pi<Float> - std::numeric_limits<float>::epsilon()) {
         float cos_scale_factor = cos(cone.normal_angle) * cone_scale_factor;
         a *= scale_factor * cos_scale_factor;
         circle_center += cone.axis * cos_scale_factor;
@@ -975,7 +975,7 @@ MTS_VARIANT void BVH<Float, Spectrum>::cone_to_obj(std::string filename, ScalarP
     }
 
     int nb_section = 12;
-    float section = 2 * M_PI / nb_section;
+    float section = 2.0f * math::Pi<Float> / nb_section;
     for (int i = 0; i < nb_section; i++) {
         Point p = circle_center + ScalarTransform4f::rotate(cone.axis, rad_to_deg(i * section)) * a;
         ofs << obj_vertex(p);
