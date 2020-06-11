@@ -205,20 +205,6 @@ public:
         return m_warp.eval(uv) * inv_sin_theta * (1.f / (2.f * sqr(math::Pi<Float>)));
     }
 
-    Spectrum get_total_radiance() const override {
-        //TODO: MODIFY TO IMPLEMENT CORRECT TOTAL RADIANCE
-        SurfaceInteraction3f si = zero<SurfaceInteraction3f>();
-
-        wavelength_t<Spectrum> wavelengths;
-        Spectrum wavelengths_weight;
-        std::tie(wavelengths, wavelengths_weight) = sample_wavelength<Float, Spectrum>(std::rand() / (double) RAND_MAX); // Should not use random, nor sample_wavelength
-
-        si.wavelengths = wavelengths;
-
-        std::cout << m_d65->eval(si) << std::endl;
-        return m_d65->eval(si);
-    }
-
     ScalarBoundingBox3f bbox() const override {
         /* This emitter does not occupy any particular region
            of space, return an invalid bounding box */

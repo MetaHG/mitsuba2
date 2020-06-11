@@ -110,20 +110,6 @@ public:
         return warp::square_to_uniform_sphere_pdf(ds.d);
     }
 
-    Spectrum get_total_radiance() const override {
-        //TODO: OVERRIDE TO IMPLEMENT CORRECT TOTAL RADIANCE
-        SurfaceInteraction3f si = zero<SurfaceInteraction3f>();
-
-        wavelength_t<Spectrum> wavelengths;
-        Spectrum wavelengths_weight;
-        std::tie(wavelengths, wavelengths_weight) = sample_wavelength<Float, Spectrum>(std::rand() / (double) RAND_MAX); // Should not use random, nor sample_wavelength
-
-        si.wavelengths = wavelengths;
-
-        std::cout << m_radiance->eval(si) << std::endl;
-        return m_radiance->eval(si);
-    }
-
     /// This emitter does not occupy any particular region of space, return an invalid bounding box
     ScalarBoundingBox3f bbox() const override {
         return ScalarBoundingBox3f();

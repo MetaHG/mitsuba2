@@ -87,12 +87,6 @@ public:
 
     virtual Spectrum get_total_radiance() const;
 
-    float get_geometry_factor() const {
-        //TODO: IMPLEMENT IN EMITTERS. WILL PROBABLY DEPEND ON SOME PARAMTERS
-        return 0;
-    }
-
-
     ENOKI_CALL_SUPPORT_FRIEND()
     MTS_DECLARE_CLASS()
 protected:
