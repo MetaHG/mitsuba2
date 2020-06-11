@@ -400,7 +400,6 @@ private:
     int m_total_nodes;
     int m_leaf_count;
     bool m_visualize_volumes;
-    std::vector<int> m_emitter_stats;
 };
 
 MTS_EXTERN_CLASS_RENDER(BVH)

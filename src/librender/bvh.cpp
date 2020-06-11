@@ -58,16 +58,6 @@ MTS_VARIANT BVH<Float, Spectrum>::~BVH() {
         return;
     }
 
-    // TODO: Clean this
-    auto b = m_emitter_stats.begin();
-    auto e = m_emitter_stats.end();
-    auto q = m_emitter_stats.begin();
-    std::advance(q, (int) (0.5 * m_emitter_stats.size()));
-    std::nth_element(b, q, e);
-    std::cout << "QUANTILE: " << *q << std::endl;
-
-    std::cout << "TREE NODE: " << m_nodes->cone() << std::endl;
-
     for (BVHPrimitive* prim: m_primitives) {
         delete prim;
     }
@@ -110,7 +100,6 @@ MTS_VARIANT void BVH<Float,Spectrum>::build() {
 }
 
 MTS_VARIANT void BVH<Float, Spectrum>::set_primitives(host_vector<ref<Emitter>, Float> emitters) {
-    m_emitter_stats = std::vector<int>();
     m_primitives = std::vector<BVHPrimitive*>();
     m_prim_index_map = std::unordered_map<const Emitter*, std::vector<ScalarIndex>>();
     for (size_t i = 0; i < emitters.size(); i++) {
@@ -122,7 +111,6 @@ MTS_VARIANT void BVH<Float, Spectrum>::set_primitives(host_vector<ref<Emitter>, 
             for (ScalarIndex j = 0; j < mesh->face_count(); j++) {
                 if (mesh->face_area(j) > 0) { // Don't add degenerate triangle with surface area of 0
                     m_primitives.push_back(new BVHPrimitive(emitters[i], j, mesh->face_bbox(j), mesh->face_cone(j)));
-                    m_emitter_stats.push_back(0);
                 } else {
                     skipped_face_count += 1;
                 }
@@ -134,7 +122,6 @@ MTS_VARIANT void BVH<Float, Spectrum>::set_primitives(host_vector<ref<Emitter>, 
                 Log(Warn, "BVH Light Hierarchy: Skipped %s faces (area is zero) of mesh with id %s", skipped_face_count, mesh->id());
             }
         } else {
-            m_emitter_stats.push_back(0);
             m_primitives.push_back(new BVHPrimitive(emitters[i]));
             m_prim_index_map[emitters[i]] = std::vector<ScalarIndex>(1, -1);
         }
@@ -361,7 +348,6 @@ BVH<Float, Spectrum>::sample_leaf(const SurfaceInteraction3f &si, float &importa
         prim_offset = leaf.primitives_offset + offset;
     }
 
-    m_emitter_stats[prim_offset] += 1;
     return m_primitives[prim_offset];
 }
 
