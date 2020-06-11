@@ -116,6 +116,7 @@ public:
         return 0.5f * norm(cross(p1 - p0, p2 - p0));
     }
 
+    /// Returns the bounding box of the face with index \c index
     template <typename Index>
     MTS_INLINE auto face_bbox(Index index, mask_t<Index> active = true) const {
         auto fi = face_indices(index, active);
@@ -131,6 +132,7 @@ public:
         return bbox;
     }
 
+    /// Returns the orientation cone of the face with index \c index
     template <typename Index>
     MTS_INLINE auto face_cone(Index index, mask_t<Index> active = true) const {
         auto fi = face_indices(index, active);
@@ -154,6 +156,7 @@ public:
         return cone;
     }
 
+    /// Returns the orientation cone of this mesh
     MTS_INLINE ScalarCone3f cone() const override {
         ScalarCone3f mesh_cone = ScalarCone3f();
         for (ScalarIndex face_idx = 0; face_idx < m_face_count; face_idx++) {
