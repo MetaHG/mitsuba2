@@ -115,6 +115,7 @@ public:
     MTS_DECLARE_CLASS()
 
 protected:
+    /// Structure used during the building of the tree.
     struct BVHPrimInfo {
         BVHPrimInfo() {
                prim_number = 0;
@@ -134,6 +135,7 @@ protected:
         ScalarCone3f cone;
     };
 
+    /// Structure used during the building of the tree.
     // TODO: Refactor to use union to save some space ?
     struct BVHNode {
         void init_leaf(int first, int n, const ScalarBoundingBox3f &box, Spectrum e_intensity, ScalarCone3f cone) {
@@ -166,6 +168,7 @@ protected:
         ScalarCone3f bcone;
     };
 
+    /// Interface structure for BVH nodes (not used anymore)
     struct IBVHEmitter {
         virtual ~IBVHEmitter() { }
         virtual Float luminance() const = 0;
@@ -173,6 +176,7 @@ protected:
         virtual ScalarCone3f cone() const = 0;
     };
 
+    /// Structure represanting the BVH nodes.
     struct LinearBVHNode : IBVHEmitter {
         // Destructor
         virtual ~LinearBVHNode() { }
@@ -213,6 +217,7 @@ protected:
         uint8_t pad[1]; // Padding for memory/cache alignment
     };
 
+    /// Structure reprensenting the BVH primitives
     struct BVHPrimitive : IBVHEmitter {
 
         // Constructors
@@ -313,19 +318,43 @@ protected:
     };
 
 protected:
+    /**
+     * \brief Sample the tree for a \c BVHPrimitive.
+     */
     BVHPrimitive* sample_tree(const SurfaceInteraction3f &si, float &importance_ratio, const Float &sample_);
 
+    /**
+     * \brief Sample a leaf node for a \c BVHPrimitive.
+     */
     BVHPrimitive* sample_leaf(const SurfaceInteraction3f &si, float &importance_ratio, const Float &sample_, const LinearBVHNode &leaf);
 
+    /**
+     * \brief Returns the pdf of sampling a given emitter primitive in the tree.
+     */
     Float pdf_tree(const SurfaceInteraction3f &si, const Emitter *emitter, const ScalarIndex face_idx);
 
+    /**
+     * \brief Returns the pdf of sampling a given emitter primitive in a leaf node.
+     */
     Float pdf_leaf(const SurfaceInteraction3f &si, const LinearBVHNode *leaf, ScalarIndex prim_idx) const;
 
+    /**
+     * \brief Compute the importance weight of the children of a node given by \c offset
+     * for the shading point given by \c ref.
+     */
     std::pair<Float, Float> compute_children_weights(int offset, const SurfaceInteraction3f &ref);
 
+    /**
+     * \brief Compute the importance weight of the children of a leaf node given by \c offset
+     * inside \c emitters for the shading point \c ref. The number of children is specified
+     * by \c size and the weights of the children are set inside \c weights.
+     */
     void compute_bvh_emitters_weights(const std::vector<BVHPrimitive*> &emitters, size_t offset, const SurfaceInteraction3f &ref,
                                       ScalarFloat weights[], size_t size) const;
 
+    /**
+     * \brief Build recursively the nodes of the BVH.
+     */
     BVHNode* recursive_build(std::vector<BVHPrimInfo> &primitive_info,
                              int start,
                              int end,
@@ -333,10 +362,16 @@ protected:
                              std::vector<BVHPrimitive*> &ordered_prims,
                              std::string node_name = "");
 
+    /**
+     * \brief Post process the BVH once it is built. Transform it
+     * for memory access optimization and children cone weight
+     * calculation optimization.
+     */
     int flatten_bvh_tree(BVHNode *node, int *offset, int parent_offset);
 
 private:
 
+    /// Structure to find splits during BVH build.
     struct BucketInfo {
         BucketInfo() {
             count = 0;
@@ -362,41 +397,29 @@ private:
         ScalarCone3f cone;
     };
 
+    /**
+     * \brief Find a split for primitives during BVH build.
+     */
     void find_split(std::vector<BVHPrimInfo> &primitive_info, int start, int end,
                     ScalarBoundingBox3f &centroid_bbox, ScalarBoundingBox3f &node_bbox, ScalarCone3f &node_cone,
                     int nb_buckets, int &split_dim, int &split_bucket, Float &min_cost);
 
+    /**
+     * \brief Calculation of the cone orientation weights for a node importance, given a shading point \c si.
+     * NOTE: Old function, here for clarity, not used anymore and replaced by \c compute_cone_weight.
+     */
     Float compute_cone_weight_old(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const;
 
+    /**
+     * \brief Calculation of the cone orientation weights for a node importance, given a shading point \c si.
+     * NOTE: This method assumes that all cones are now storing the cosine value of
+     * their \c normal_angle and \c emission_angle.
+     */
     Float compute_cone_weight(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const;
 
-    Float compute_cone_weight_custom(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const;
-
-    MTS_INLINE Float sine(Float x) const {
-        const float B = 4/math::Pi<Float>;
-        const float C = -4/(math::Pi<Float>*math::Pi<Float>);
-
-        float y = B * x + C * x * abs(x);
-
-        //  const float Q = 0.775;
-        const float P = 0.225;
-
-        y = P * (y * abs(y) - y) + y;   // Q * y + P * y * abs(y)
-
-
-        return y;
-    }
-
-    MTS_INLINE Float cosine(Float x) const {
-        return sine(x + (math::Pi<Float>/ 2));
-    }
-
-    MTS_INLINE Float arccosine(Float x) const {
-       return (-Float(0.69813170079773212) * x * x - Float(0.87266462599716477)) * x + Float(1.5707963267948966);
-    }
-
-
-
+    /**
+     * \brief Create a leaf for BVH building.
+     */
     BVHNode* create_leaf(std::vector<BVHPrimInfo> &primitive_info,
                          int start,
                          int end,
@@ -405,20 +428,35 @@ private:
                          Spectrum intensity = 0.f,
                          ScalarCone3f cone = ScalarCone3f());
 
+    /**
+     * \brief Compute the "luminance" of a given spectrum \c intensity.
+     */
     static MTS_INLINE Float compute_luminance(Spectrum intensity) {
         return hmean(intensity);
     }
 
+    /**
+     * \brief Save the BVH to multiple Wavefront .OBJ files.
+     * The bounding boxes and orientation cones of the BVH
+     * nodes are saved to separate .OBJ files.
+     */
     void save_to_obj(std::string node_name, ScalarBoundingBox3f bbox, ScalarCone3f cone);
 
+    /**
+     * \brief Save the orientation cones of the BVH nodes
+     * to separate Wavefront .OBJ files.
+     */
     void cone_to_obj(std::string filename, ScalarPoint3f center, ScalarCone3f cone);
 
+    /// Utility function to format a point for Wavefront .OBJ files.
     MTS_INLINE std::string obj_vertex(ScalarPoint3f p) {
         std::ostringstream oss;
         oss << "v " << p.x() << " " << p.y() << " " << p.z() << std::endl;
         return oss.str();
     }
 
+    /// Utility function to get the name of a split heuristic.
+    // TODO: REFACTOR
     std::string split_heuristic_to_string(const SplitMethod &m) const {
         switch (m) {
             case SplitMethod::SAOH: return "SAOH"; break;
@@ -430,6 +468,8 @@ private:
         Throw("Light hierarchy BVH: Unknown split heuristic");
     }
 
+    /// Utility function to get the name of an cluster importance method.
+    // TODO: REFACTOR
     std::string cluster_importance_to_string(const ClusterImportanceMethod &m) const {
         switch (m) {
             case ClusterImportanceMethod::BASE_ESTEVEZ_PAPER: return "Base Estevez"; break;
