@@ -51,6 +51,26 @@ public:
     virtual PositionSample3f sample_position(Float time, const Point2f &sample,
                                              Mask active = true) const;
 
+    /**
+     * \brief Sample a point on the surface of the triangle \c face_idx of this shape
+     *
+     * The sampling strategy is ideally uniform over the surface, though
+     * implementations are allowed to deviate from a perfectly uniform
+     * distribution as long as this is reflected in the returned probability
+     * density.
+     *
+     * \param face_idx
+     *     The face id of the triangle on which to sample a position
+     *
+     * \param time
+     *     The scene time associated with the position sample
+     *
+     * \param sample
+     *     A uniformly distributed 2D point on the domain <tt>[0,1]^2</tt>
+     *
+     * \return
+     *     A \ref PositionSample instance describing the generated sample
+     */
     virtual PositionSample3f sample_face_position(ScalarIndex face_idx,
                                                   Float time,
                                                   const Point2f &sample,
@@ -68,6 +88,19 @@ public:
      */
     virtual Float pdf_position(const PositionSample3f &ps, Mask active = true) const;
 
+    /**
+     * \brief Query the probability density of \ref sample_face_position() for
+     * a particular point on the triangle surface.
+     *
+     * \param face_idx
+     *     The face id of the triangle
+     *
+     * \param ps
+     *     A position record describing the sample in question
+     *
+     * \return
+     *     The probability density per unit area
+     */
     virtual Float pdf_face_position(ScalarIndex &face_idx,
                                     const PositionSample3f &ps,
                                     Mask active = true) const;
@@ -101,6 +134,36 @@ public:
     virtual DirectionSample3f sample_direction(const Interaction3f &it, const Point2f &sample,
                                                Mask active = true) const;
 
+    /**
+     * \brief Sample a direction towards a triangle of this shape with respect to solid
+     * angles measured at a reference position within the scene
+     *
+     * An ideal implementation of this interface would achieve a uniform solid
+     * angle density within the surface region that is visible from the
+     * reference position <tt>it.p</tt> (though such an ideal implementation
+     * is usually neither feasible nor advisable due to poor efficiency).
+     *
+     * The function returns the sampled position and the inverse probability
+     * per unit solid angle associated with the sample.
+     *
+     * When the Shape subclass does not supply a custom implementation of this
+     * function, the \ref Shape class reverts to a fallback approach that
+     * piggybacks on \ref sample_face_position(). This will generally lead to a
+     * suboptimal sample placement and higher variance in Monte Carlo
+     * estimators using the samples.
+     *
+     * \param face_idx
+     *     The face id of the triangle on which to sample a direction
+     *
+     * \param it
+     *    A reference position somewhere within the scene.
+     *
+     * \param sample
+     *     A uniformly distributed 2D point on the domain <tt>[0,1]^2</tt>
+     *
+     * \return
+     *     A \ref DirectionSample instance describing the generated sample
+     */
     virtual DirectionSample3f sample_face_direction(const ScalarIndex face_idx,
                                                     const Interaction3f &it,
                                                     const Point2f &sample,
@@ -121,6 +184,21 @@ public:
     virtual Float pdf_direction(const Interaction3f &it, const DirectionSample3f &ds,
                                 Mask active = true) const;
 
+    /**
+     * \brief Query the probability density of \ref sample_face_direction()
+     *
+     * \param face_idx
+     *     The face id of the triangle
+     *
+     * \param it
+     *    A reference position somewhere within the scene.
+     *
+     * \param ps
+     *     A position record describing the sample in question
+     *
+     * \return
+     *     The probability density per unit solid angle
+     */
     virtual Float pdf_face_direction(ScalarIndex &face_idx,
                                      const Interaction3f &it,
                                      const DirectionSample3f &ds,
