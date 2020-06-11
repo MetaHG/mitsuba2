@@ -206,7 +206,7 @@ MTS_VARIANT Float BVH<Float, Spectrum>::pdf_emitter_direction_pure(const Surface
         emitter_pdf = emitter->pdf_direction(ref, ds, active);
     }
 
-    return 1.0f; //emitter_pdf * pdf_tree(ref, emitter, face_idx);
+    return 1.0f;
 }
 
 MTS_VARIANT typename BVH<Float, Spectrum>::BVHPrimitive*
@@ -359,7 +359,8 @@ MTS_VARIANT void BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::v
                 BVHPrimitive* emitter = emitters[offset + i];
                 weights[i] *= compute_cone_weight(emitter->prim_bbox, emitter->prim_cone_cosine, ref);
             }
-        }
+        } // We let flow into the next case, as we want to consider the distance terms for this method as well.
+
         case ClusterImportanceMethod::BASE_STOCHASTIC_YUKSEL_PAPER: {
             for (size_t i = 0; i < size; i++) {
                 distances[i] = emitters[offset + i]->bbox().squared_distance(ref.p);
@@ -377,7 +378,8 @@ MTS_VARIANT void BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::v
                 BVHPrimitive* emitter = emitters[offset + i];
                 weights[i] *= compute_cone_weight(emitter->prim_bbox, emitter->prim_cone_cosine, ref);
             }
-        }
+        } // We let flow into the next case, as we want to consider the distance terms for this method as well.
+
         case ClusterImportanceMethod::BASE_ESTEVEZ_PAPER: {
             for (size_t i = 0; i < size; i++) {
                 distances[i] = max(max(squared_norm(emitters[offset + i]->bbox().extents()) / 4.0f, std::numeric_limits<Float>::epsilon()),
@@ -412,7 +414,7 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
         case ClusterImportanceMethod::ORIENTATION_STOCHASTIC_YUKSEL_PAPER: {
             l_weight *= compute_cone_weight(ln.node_bbox, ln.node_cone_cosine, ref);
             r_weight *= compute_cone_weight(rn.node_bbox, rn.node_cone_cosine, ref);
-        }
+        } // We let flow into the next case, as we want to consider the distance terms for this method as well.
 
         case ClusterImportanceMethod::BASE_STOCHASTIC_YUKSEL_PAPER: {
             left_d *= ln.node_bbox.squared_distance(ref.p);
@@ -429,7 +431,7 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
         default: {
             l_weight *= compute_cone_weight(ln.node_bbox, ln.node_cone_cosine, ref);
             r_weight *= compute_cone_weight(rn.node_bbox, rn.node_cone_cosine, ref);
-        }
+        } // We let flow into the next case, as we want to consider the distance terms for this method as well.
 
         case ClusterImportanceMethod::BASE_ESTEVEZ_PAPER: {
             left_d = max(max(squared_norm(ln.node_bbox.extents()) / 4.0f, std::numeric_limits<Float>::epsilon()), squared_norm(ln.node_bbox.center() - ref.p));
@@ -455,6 +457,8 @@ MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const Scal
     for (size_t i = 0; i < 8; i++) {
         ScalarPoint3f bbox_corner;
 
+        // Surprisingly, using a switch here instead of a precomputed array is faster according
+        // to the valgrind profiler.
         switch (i) {
             case 0: bbox_corner = bbox.min; break;
             case 1: bbox_corner = ScalarPoint3f(bbox.max[0], bbox.min[1], bbox.min[2]); break;
@@ -823,6 +827,7 @@ MTS_VARIANT void BVH<Float, Spectrum>::save_to_obj(std::string node_name, Scalar
     oss << dir_name << "/" << node_name << ".obj";
     std::ofstream ofs(oss.str(), std::ofstream::out);
 
+    // TODO: Extract the bounding box saving to a sub-function.
     ofs << "# Vertices" << std::endl;
     for (size_t j = 0; j < 8; j++) {
         Point p = bbox.corner(j);
