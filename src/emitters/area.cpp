@@ -155,7 +155,8 @@ public:
     ScalarBoundingBox3f bbox() const override { return m_shape->bbox(); }
 
     Spectrum get_total_radiance() const override {
-        //TODO: OVERRIDE TO IMPLEMENT CORRECT TOTAL RADIANCE
+        // This method is correct only for the scalar_rgb mode.
+        //TODO: modify such that the method is compatible with other modes than scalar_rgb.
         SurfaceInteraction3f si = zero<SurfaceInteraction3f>();
 
         wavelength_t<Spectrum> wavelengths;
@@ -168,7 +169,8 @@ public:
     }
 
     Spectrum get_radiance() const override {
-        //TODO: OVERRIDE TO IMPLEMENT CORRECT RADIANCE
+        // This method is correct only for the scalar_rgb mode.
+        //TODO: modify such that the method is compatible with other modes than scalar_rgb.
         SurfaceInteraction3f si = zero<SurfaceInteraction3f>();
 
         wavelength_t<Spectrum> wavelengths;
