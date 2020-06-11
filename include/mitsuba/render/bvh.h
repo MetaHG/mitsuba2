@@ -53,8 +53,6 @@ public:
                                 const DirectionSample3f &ds,
                                 Mask active);
 
-    void to_obj();
-
     /// Return a human-readable string representation of the bvh.
     virtual std::string to_string() const override;
 

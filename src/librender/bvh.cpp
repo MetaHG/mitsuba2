@@ -209,39 +209,6 @@ MTS_VARIANT Float BVH<Float, Spectrum>::pdf_emitter_direction_pure(const Surface
     return 1.0f; //emitter_pdf * pdf_tree(ref, emitter, face_idx);
 }
 
-// TODO: Refactor this
-MTS_VARIANT void BVH<Float, Spectrum>::to_obj() {
-    std::string dir_name = "lighttree_bboxes";
-
-    std::filesystem::path dir(dir_name);
-    if (!std::filesystem::exists(dir)) {
-        std::filesystem::create_directory(dir);
-    }
-
-
-    for (int i = 0; i < m_total_nodes; i++) {
-        std::ostringstream oss;
-        oss << dir_name << "/" << i << ".obj";
-        std::ofstream ofs(oss.str(), std::ofstream::out);
-
-        ofs << "# Vertices" << std::endl;
-        for (size_t j = 0; j < 8; j++) {
-            Point p = m_nodes[i].node_bbox.corner(j);
-            ofs << "v " << p.x() << " " << p.y() << " " << p.z() << std::endl;
-        }
-
-        ofs << std::endl << "# Faces" << std::endl;
-        ofs << "f 1 2 4 3" << std::endl;
-        ofs << "f 1 5 6 2" << std::endl;
-        ofs << "f 5 6 8 7" << std::endl;
-        ofs << "f 3 7 8 4" << std::endl;
-        ofs << "f 1 5 7 3" << std::endl;
-        ofs << "f 6 2 4 8" << std::endl;
-
-        ofs.close();
-    }
-}
-
 MTS_VARIANT typename BVH<Float, Spectrum>::BVHPrimitive*
 BVH<Float, Spectrum>::sample_tree(const SurfaceInteraction3f &si, float &importance_ratio, const Float &sample_) {
     importance_ratio = 1.0;
