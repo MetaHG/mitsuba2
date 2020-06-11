@@ -1,6 +1,7 @@
 #include <mitsuba/render/bvh.h>
 #include <mitsuba/render/mesh.h>
 #include <mitsuba/core/distr_1d.h>
+#include <mitsuba/core/timer.h>
 #include <filesystem>
 
 NAMESPACE_BEGIN(mitsuba)
@@ -66,7 +67,10 @@ MTS_VARIANT BVH<Float, Spectrum>::~BVH() {
 }
 
 MTS_VARIANT void BVH<Float,Spectrum>::build() {
-    Log(Info, "Building a BVH Light Hierarchy");
+    Timer timer = Timer();
+    std::ostringstream timer_string;
+    timer_string << "Building a BVH light hierarchy (" << m_primitives.size() << " emitter primitive(s))";
+    timer.begin_stage(timer_string.str());
 
     if (m_primitives.size() == 0) {
         return;
@@ -95,7 +99,7 @@ MTS_VARIANT void BVH<Float,Spectrum>::build() {
     int offset = 0;
     flatten_bvh_tree(root, &offset, -1);
 
-    Log(Info, "Finished.");
+    timer.end_stage();
     Log(Info, "%s", this->to_string());
 }
 
