@@ -10,6 +10,7 @@ NAMESPACE_BEGIN(mitsuba)
 #define YUKSEL_DISTANCE_RATIO 1.0f
 #define NB_CHILDREN_PER_NODE 2
 #define MAX_PRIMS_IN_NODE 255
+#define SAOH_COST_OFFSET 0.125f
 
 MTS_VARIANT BVH<Float,Spectrum>::BVH(const Properties &props) {
     m_split_mesh = props.bool_("split_mesh", true);
@@ -224,7 +225,7 @@ MTS_VARIANT void BVH<Float, Spectrum>::to_obj() {
         std::ofstream ofs(oss.str(), std::ofstream::out);
 
         ofs << "# Vertices" << std::endl;
-        for (size_t j = 0; j < 8; j++) { // Magic number here: TODO DEFINE: 8 = number of corners in bounding box
+        for (size_t j = 0; j < 8; j++) {
             Point p = m_nodes[i].node_bbox.corner(j);
             ofs << "v " << p.x() << " " << p.y() << " " << p.z() << std::endl;
         }
@@ -376,7 +377,6 @@ MTS_VARIANT void BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::v
     bool account_for_distance = true;
 
     for (size_t i = 0; i < size; i++) {
-//        weights[i] = compute_luminance(emitters[offset + i]->intensity());
         weights[i] = emitters[offset + i]->prim_luminance;
         distances[i] = ScalarFloat(1.0f);
     }
@@ -391,7 +391,6 @@ MTS_VARIANT void BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::v
             for (size_t i = 0; i < size; i++) {
                 BVHPrimitive* emitter = emitters[offset + i];
                 weights[i] *= compute_cone_weight(emitter->prim_bbox, emitter->prim_cone_cosine, ref);
-//                weights[i] *= compute_cone_weight_old(emitter->bbox(), emitter->cone(), ref);
             }
         }
         case ClusterImportanceMethod::BASE_STOCHASTIC_YUKSEL_PAPER: {
@@ -410,7 +409,6 @@ MTS_VARIANT void BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::v
             for (size_t i = 0; i < size; i++) {
                 BVHPrimitive* emitter = emitters[offset + i];
                 weights[i] *= compute_cone_weight(emitter->prim_bbox, emitter->prim_cone_cosine, ref);
-//                weights[i] *= compute_cone_weight_old(emitter->bbox(), emitter->cone(), ref);
             }
         }
         case ClusterImportanceMethod::BASE_ESTEVEZ_PAPER: {
@@ -423,8 +421,6 @@ MTS_VARIANT void BVH<Float, Spectrum>::compute_bvh_emitters_weights(const std::v
     }
 
     for (size_t i = 0; i < size; i++) {
-//        weights[i] /= distances[i];
-
         // Epsilon is added as area_distribution_1d does not handle full zero weights.
         weights[i] = (weights[i] + std::numeric_limits<Float>::epsilon()) / (account_for_distance ? distances[i] : 1.0f);
     }
@@ -434,8 +430,6 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
     const LinearBVHNode &ln = m_nodes[offset + 1];
     const LinearBVHNode &rn = m_nodes[m_nodes[offset].second_child_offset];
 
-//    Float l_weight = compute_luminance(ln.node_intensity);
-//    Float r_weight = compute_luminance(rn.node_intensity);
     Float l_weight = ln.node_luminance;
     Float r_weight = rn.node_luminance;
 
@@ -468,29 +462,6 @@ MTS_VARIANT std::pair<Float, Float> BVH<Float, Spectrum>::compute_children_weigh
         default: {
             l_weight *= compute_cone_weight(ln.node_bbox, ln.node_cone_cosine, ref);
             r_weight *= compute_cone_weight(rn.node_bbox, rn.node_cone_cosine, ref);
-
-//            Float l_cone_weight = compute_cone_weight_old(ln.node_bbox, ScalarCone3f(ln.node_cone_cosine.axis, acos(ln.node_cone_cosine.normal_angle), acos(ln.node_cone_cosine.emission_angle)), ref);
-//            Float l_cone_weight_test = compute_cone_weight(ln.node_bbox, ln.node_cone_cosine, ref);
-//            Float left_abs_error = abs(l_cone_weight_test - l_cone_weight);
-//            Float left_error = left_abs_error / l_cone_weight;
-//            if (left_error >= 0.01f && left_abs_error > 0.001f) {
-//                Log(Warn, "Left error: %s, correct: %s, test: %s", left_error, l_cone_weight, l_cone_weight_test);
-//            }
-
-//            Float r_cone_weight = compute_cone_weight_old(rn.node_bbox, ScalarCone3f(rn.node_cone_cosine.axis, acos(rn.node_cone_cosine.normal_angle), acos(rn.node_cone_cosine.emission_angle)), ref);
-//            Float r_cone_weight_test = compute_cone_weight(rn.node_bbox, rn.node_cone_cosine, ref);
-//            Float right_abs_error = abs(r_cone_weight_test - r_cone_weight);
-//            Float right_error = right_abs_error / r_cone_weight;
-//            if (right_error >= 0.01f && right_abs_error > 0.001f) {
-//                Log(Warn, "Right error: %s, correct: %s, test: %s", right_error, r_cone_weight, r_cone_weight_test);
-//            }
-
-
-
-//            Log(Info, "Left error: %s", abs(l_cone_weight_test - l_cone_weight) / l_cone_weight);
-//            Log(Info, "Right error: %s", abs(r_cone_weight_test - r_cone_weight) / r_cone_weight);
-//            Log(Warn, "Left: correct: %s, test: %s", compute_cone_weight(ln.node_bbox, ln.node_cone, ref), compute_cone_weight_test(ln.node_bbox, ln.node_cone, ref));
-//            Log(Warn, "Right: correct: %s, test: %s", compute_cone_weight(rn.node_bbox, rn.node_cone, ref), compute_cone_weight_test(rn.node_bbox, rn.node_cone, ref));
         }
 
         case ClusterImportanceMethod::BASE_ESTEVEZ_PAPER: {
@@ -543,7 +514,6 @@ MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const Scal
     Float cos_min_incident_angle = 1.0f;
     Float cos_min_emission_angle = 1.0f;
 
-//    Log(Info, "Test: in_angle %s, cos_in_angle %s, bangle %s, cos_bangle %s", acos(cos_incident_angle), cos_incident_angle, acos(cos_bounding_angle), cos_bounding_angle);
     bool box_visible = cos_incident_angle < cos_bounding_angle;
 
     bool potential_illumination =
@@ -556,8 +526,6 @@ MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const Scal
     }
 
     if (potential_illumination) {
-//        Log(Info, "Test: Has potential illumination, caxis_p_angle: %s, cos_caxis_p_angle: %s, cone_normal_angle: %s, cos_cone_normal_angle %s", acos(cos_cone_axis_and_box_to_p), cos_cone_axis_and_box_to_p, cone.normal_angle, cos_cone_normal_angle);
-
         cos_min_emission_angle = cos_cone_axis_and_box_to_p * cos_cone_normal_angle * cos_bounding_angle
                 + sin_cone_axis_and_box_to_p * sin_cone_normal_angle * cos_bounding_angle
                 + sin_cone_axis_and_box_to_p * cos_cone_normal_angle * sin_bounding_angle
@@ -567,8 +535,7 @@ MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const Scal
     Float cos_cone_emission_angle = cone_cosine.emission_angle;
     Float cone_weight = 0;
     if (cos_min_emission_angle > cos_cone_emission_angle) {
-//        Log(Info, "Test: cos_min_emission_angle: %s", cos_min_emission_angle);
-        cone_weight = max(cos_min_incident_angle, 0) * cos_min_emission_angle; // cos_min_incident_angle is not 1 when it should (when cone_weight should be 1)
+        cone_weight = max(cos_min_incident_angle, 0) * cos_min_emission_angle;
     }
 
     return cone_weight;
@@ -577,34 +544,15 @@ MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight(const Scal
 MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight_old(const ScalarBoundingBox3f &bbox, const ScalarCone3f &cone, const SurfaceInteraction3f &si) const {
     ScalarVector3f p_to_box_center = normalize(bbox.center() - si.p);
 
-//  MATH_PI
-//    if (!node->bbox.contains(si.p) && node->bcone.normal_angle + node->bcone.emission_angle <= M_PI_2f32 && dot(node->bcone.axis, -p_to_box_center) < 0) {
-//        return 0;
-//    }
-
     Float in_angle = acos(dot(p_to_box_center, si.n));
-//    Log(Info, "p_to_box_center: %s, si.n: %s", p_to_box_center, si.n);
-
     Float bangle = bbox.solid_angle(si.p);
-
-//    Log(Info, "Normal: in_angle %s, cos_in_angle %s, bangle %s, cos_bangle %s", in_angle, cos(in_angle), bangle, cos(bangle));
     Float min_in_angle = max(in_angle - bangle, 0);
-//    Log(Info, "In_angle: %s, bangle: %s, min_in_angle: %s", rad_to_deg(in_angle), rad_to_deg(bangle), rad_to_deg(min_in_angle));
 
     Float caxis_p_angle = acos(dot(cone.axis, -p_to_box_center));
-
-//    if (caxis_p_angle - cone.normal_angle - bangle > 0) {
-//        Log(Info, "Normal: Has potential illumination, caxis_p_angle: %s, cos_caxis_p_angle: %s, cone_normal_angle: %s, cos_cone_normal_angle %s", caxis_p_angle, cos(caxis_p_angle), cone.normal_angle, cos(cone.normal_angle));
-//    }
-
     Float min_e_angle = max(caxis_p_angle - cone.normal_angle - bangle, 0);
-//    Log(Info, "caxis_p_angle: %s, min_e_angle: %s", rad_to_deg(caxis_p_angle), rad_to_deg(min_e_angle));
-
-//    Log(Info, "Cluster cone: %s", node->cone());
 
     Float cone_weight = 0;
     if (min_e_angle < cone.emission_angle) {
-//        Log(Info, "Normal: cos_min_emission_angle: %s", cos(min_e_angle));
         cone_weight = max(cos(min_in_angle), 0) * cos(min_e_angle);
     }
 
@@ -612,7 +560,7 @@ MTS_VARIANT MTS_INLINE Float BVH<Float,Spectrum>::compute_cone_weight_old(const 
 }
 
 
-// MAYBE REFACTOR THIS WITH SMALLER METHODS
+// TODO: Split this into sub-functions for modularity and clarity.
 MTS_VARIANT typename BVH<Float,Spectrum>::BVHNode*
 BVH<Float,Spectrum>::recursive_build(std::vector<BVHPrimInfo> &primitive_info,
                                      int start,
@@ -845,27 +793,23 @@ MTS_VARIANT void BVH<Float, Spectrum>::find_split(std::vector<BVHPrimInfo> &prim
             if (b1.valid()) {
                 b1_surface_area = b1.surface_area();
             }
-            // TODO: CLEAN THIS METHOD
+
             if (m_split_heuristic == SplitMethod::SAOH) {
                 if (node_bbox.surface_area() < std::numeric_limits<float>::epsilon()) {
-                    //cost[i] = squared_norm(node_bbox.extents()) * (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
                     cost[i] = (compute_luminance(i0) * c0.surface_area() + compute_luminance(i1) * c1.surface_area()) / node_cone.surface_area();
                 } else {
-                    cost[i] = (compute_luminance(i0) * b0_surface_area * c0.surface_area() // TODO: Need to add regularizer from paper?
+                    cost[i] = (compute_luminance(i0) * b0_surface_area * c0.surface_area()
                                + compute_luminance(i1) * b1_surface_area * c1.surface_area())
                             / (node_bbox.surface_area() * node_cone.surface_area());
-
-//                            cost[i] = (compute_luminance(i0) * squared_norm(b0.extents()) * c0.surface_area()
-//                                       + compute_luminance(i1) * squared_norm(b1.extents() * c1.surface_area()));
                 }
+
                 // Split dimension factor: favorise split on large axis.
-                cost[i] *= major_axis_extents_norm / (node_bbox.max[dim] - node_bbox.min[dim]);
+                cost[i] *= major_axis_extents_norm / (node_bbox.max[dim] - node_bbox.min[dim]); // Should it be node_bbox or centroid_bbox?)
             } else {
                 // m_split_method == SplitMethod::SAH
-                cost[i] = 0.125f + (count0 * b0_surface_area + // TODO: Define this cost
+                cost[i] = SAOH_COST_OFFSET + (count0 * b0_surface_area +
                                     count1 * b1_surface_area) / node_bbox.surface_area();
             }
-
         }
 
         for (int i = 0; i < nb_buckets - 1; i++) {
@@ -913,7 +857,7 @@ MTS_VARIANT void BVH<Float, Spectrum>::save_to_obj(std::string node_name, Scalar
     std::ofstream ofs(oss.str(), std::ofstream::out);
 
     ofs << "# Vertices" << std::endl;
-    for (size_t j = 0; j < 8; j++) { // Magic number here: TODO DEFINE: 8 = number of corners in bounding box
+    for (size_t j = 0; j < 8; j++) {
         Point p = bbox.corner(j);
         ofs << "v " << p.x() << " " << p.y() << " " << p.z() << std::endl;
     }
