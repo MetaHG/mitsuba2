@@ -21,6 +21,14 @@ template <typename Float_, typename Point_> struct Cone {
         axis(v), normal_angle(n_angle), emission_angle(e_angle) { }
     Cone(const Cone &c): axis(c.axis), normal_angle(c.normal_angle), emission_angle(c.emission_angle) { }
 
+    /**
+     * \brief Calculate the scalar measure of the cone.
+     * The scalar measure corresponds to the sum of the
+     * solid angle defined by \c normal_angle and to
+     * the solid angle defined by \c emission_angle
+     * weighted by a cosine factor to account for the
+     * (light) falloff.
+     */
     Scalar surface_area() {
         Scalar total_angle = min(normal_angle + emission_angle, math::Pi<Float>);
         Scalar cos_n_angle = cos(normal_angle);
@@ -33,6 +41,11 @@ template <typename Float_, typename Point_> struct Cone {
                                             + cos_n_angle);
     }
 
+    /**
+     * \brief Checks that either a cone \c c1 covers
+     * a cone \c c2 or that a cone \c c2 covers a
+     * cone \c c1.
+     */
     static bool covered(const Cone &c1, const Cone &c2) {
         if (!c1.valid() || !c2.valid()) {
             if (!c1.valid()) {
@@ -50,6 +63,10 @@ template <typename Float_, typename Point_> struct Cone {
         return min(diff_angle + c2.normal_angle, math::Pi<Float>) <= c1.normal_angle + std::numeric_limits<float>::epsilon();
     }
 
+    /**
+     * \brief Merge two cones \c c1 and \c c2 together
+     * and return the resulting cone as a new cone.
+     */
     static Cone merge(const Cone &c1, const Cone &c2) {
         if (!c1.valid() || !c2.valid()) {
             if (!c1.valid()) {
@@ -93,10 +110,25 @@ template <typename Float_, typename Point_> struct Cone {
         return { new_axis, n_angle, e_angle };
     }
 
+    /**
+     * \brief Check whether this is a valid cone
+     *
+     * A cone \c cone is considered to be valid when
+     * \code
+     * cone.axis[i] != 0
+     * \endcode
+     * holds for each component \c i.
+     */
     bool valid() const {
         return any(axis != 0);
     }
 
+    /**
+     * \brief Mark the cone as invalid.
+     *
+     * This operation sets the components of the axis to zero
+     * and both the normal and emission angle to zero.
+     */
     void reset() {
         axis = Vector(0);
         normal_angle = emission_angle = 0;
