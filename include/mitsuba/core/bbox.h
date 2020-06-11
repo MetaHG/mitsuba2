@@ -251,7 +251,11 @@ template <typename Point_> struct BoundingBox {
         return enoki::sqrt(squared_distance(bbox));
     }
 
-
+    /**
+     * \brief Calculate the offset of a point \c p inside
+     * the bounding box. The value returned is a vector
+     * with an offset value between 0 and 1 for each dimension.
+     */
     Vector offset(const Point &p) const {
         Vector d = p - min;
         Vector extents = this->extents();
@@ -265,6 +269,10 @@ template <typename Point_> struct BoundingBox {
         return d;
     }
 
+    /**
+     * \brief Calculate the angle required to cover the full
+     * bounding box from the point \c p.
+     */
     Scalar solid_angle(const Point &p) const {
         Scalar min_dot = 1;
 
