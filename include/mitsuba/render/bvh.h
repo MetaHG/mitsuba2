@@ -24,31 +24,87 @@ public:
     using ScalarIndex = uint32_t; // TODO: See how to import this from shape
     using EmitterPtr = replace_scalar_t<Float, const Emitter *>;
 
+    /**
+     * \brief Set the different properties of the BVH.
+     * The function \c set_primitives and \c build must
+     * be called afterwards.
+     */
     BVH(const Properties &props);
 
+    /**
+     * \brief Builds a BVH from the given parameters.
+     */
     BVH(host_vector<ref<Emitter>, Float> p, int max_prims_in_node, SplitMethod split_method,
         ClusterImportanceMethod cluster_importance_method, bool split_mesh, bool uniform_leaf_sampling, bool visualize_volumes = false);
 
     ~BVH();
 
+    /**
+     * \brief Builds a bounding volume hierarchy from
+     * \c m_primitives. The function \c set_primitives
+     * must have been called before.
+     */
     void build();
 
+    /**
+     * \brief Set the primitives from which the BVH
+     * will be built. The function \c build must be
+     * called afterwards.
+     */
     void set_primitives(host_vector<ref<Emitter>, Float> emitters);
 
+    /**
+     * \brief Returns the \c m_split_mesh paramter
+     * of the BVH.
+     */
     MTS_INLINE bool split_mesh() const {
         return m_split_mesh;
     }
 
+    /**
+     * \brief Sample an emitter in the tree given
+     * a random number \c tree_sample for tree sampling,
+     * a surface interaction \c ref of the shading point
+     * to illuminate and a random number \c emitter_sample
+     * to sample a point on the chosen emitter.
+     */
     std::pair<DirectionSample3f, Spectrum> sample_emitter(const Float &tree_sample, const SurfaceInteraction3f &ref,
                                                           const Point2f &emitter_sample, const Mask active);
 
+    /**
+     * \brief Return the pdf to sample a direction on the
+     * given a filled surface interaction \c ref of the
+     * illuminated shading point and a direction sampling
+     * record \c ds which specifies the query location.
+     */
     Float pdf_emitter_direction(const SurfaceInteraction3f &ref,
                                 const DirectionSample3f &ds,
                                 Mask active);
 
+    /**
+     * \brief Sample the "pure" spectrum of an emitter in the tree given
+     * a random number \c tree_sample for tree sampling,
+     * a surface interaction \c ref of the shading point
+     * to illuminate and a random number \c emitter_sample
+     * to sample a point on the chosen emitter.
+     *
+     * NOTE: The returned direction sampling record does not contain meaningful
+     * information and the spectrum returned corresponds to the "pure" emitter
+     * radiance.
+     * This function is only used in the \c Emitter integrator.
+     */
     std::pair<DirectionSample3f, Spectrum> sample_emitter_pure(const Float &tree_sample, const SurfaceInteraction3f &ref,
                                                                const Point2f &emitter_sample, const Mask active);
 
+    /**
+     * \brief Return the pdf to sample a direction on the
+     * given a filled surface interaction \c ref of the
+     * illuminated shading point and a direction sampling
+     * record \c ds which specifies the query location.
+     *
+     * NOTE: This function is only used in the \c Emitter integrator
+     * and always return 1.0f.
+     */
     Float pdf_emitter_direction_pure(const SurfaceInteraction3f &ref,
                                 const DirectionSample3f &ds,
                                 Mask active);
