@@ -163,8 +163,6 @@ public:
         return mesh_cone;
     }
 
-    virtual ScalarIndex face(const PositionSample3f &ps, Mask active) const;
-
     /// Does this mesh have per-vertex normals?
     bool has_vertex_normals() const { return slices(m_vertex_normals_buf) != 0; }
 

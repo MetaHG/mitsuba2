@@ -408,44 +408,6 @@ Mesh<Float, Spectrum>::sample_face_position(ScalarIndex face_idx, Float time, co
     return ps;
 }
 
-MTS_VARIANT typename Mesh<Float, Spectrum>::ScalarIndex
-Mesh<Float, Spectrum>::face(const PositionSample3f &ps, Mask active) const {
-    for (ScalarIndex face_idx = 0; face_idx < m_face_count; face_idx++) {
-        Array<ScalarIndex, 3> fi = face_indices(face_idx, active);
-
-        Point3f p0 = vertex_position(fi[0], active),
-                p1 = vertex_position(fi[1], active),
-                p2 = vertex_position(fi[2], active);
-
-        Vector3f e0 = p1 - p0, e1 = p2 - p0;
-
-        Normal3f n = normalize(cross(e0, e1));
-
-        Float plane_intercept = dot(p0, n);
-        Float ps_intercept = dot(ps.p, n);
-        Float diff = plane_intercept - ps_intercept;
-        if (diff < std::numeric_limits<Float>::epsilon()) {
-            // Check that point lies inside the triangle. Compute barycentric coordinates.
-            Vector3f e2 = ps.p - p0;
-            Float d00 = dot(e0, e0);
-            Float d01 = dot(e0, e1);
-            Float d11 = dot(e1, e1);
-            Float d20 = dot(e2, e0);
-            Float d21 = dot(e2, e1);
-            Float denom = d00 * d11 - d01 * d01;
-            Float v = (d11 * d20 - d01 * d21) / denom;
-            Float w = (d00 * d21 - d01 * d20) / denom;
-            Float u = 1.0f - v - w;
-
-            if (u > 0 && v > 0 && w > 0 && (u + v + w - 1.0f) < std::numeric_limits<Float>::epsilon()) {
-                return face_idx;
-            }
-        }
-    }
-
-    throw std::runtime_error("Mesh: face(point): Point is not on mesh");
-}
-
 MTS_VARIANT Float Mesh<Float, Spectrum>::pdf_position(const PositionSample3f &, Mask) const {
     area_distr_ensure();
     return m_area_distr.normalization();
