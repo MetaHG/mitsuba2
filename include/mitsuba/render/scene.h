@@ -99,6 +99,33 @@ public:
                              bool test_visibility = true,
                              Mask active = true) const;
 
+    /**
+     * \brief Direct illumination sampling routine when using a BVH light hierarchy
+     *
+     * Given an arbitrary reference point in the scene, this method samples a
+     * direction from the reference point to towards an emitter.
+     *
+     * Ideally, the implementation should importance sample the product of the
+     * emission profile and the geometry term between the reference point and
+     * the position on the emitter.
+     *
+     * \param ref
+     *    A reference point somewhere within the scene
+     *
+     * \param sample
+     *    A uniformly distributed 2D vector
+     *
+     * \param sample
+     *    A uniformly distributed 1D sample
+     *
+     * \param test_visibility
+     *    When set to \c true, a shadow ray will be cast to ensure that the
+     *    sampled emitter position and the reference point are mutually visible.
+     *
+     * \return
+     *    Radiance received along the sampled ray divided by the sample
+     *    probability.
+     */
     std::pair<DirectionSample3f, Spectrum>
     sample_emitter_direction_custom(const SurfaceInteraction3f &ref,
                              const Point2f &sample,
@@ -106,6 +133,33 @@ public:
                              bool test_visibility = true,
                              Mask active = true) const;
 
+    /**
+     * \brief Direct illumination sampling routine when using the \c Emitter integrator.
+     *
+     * Given an arbitrary reference point in the scene, this method samples a
+     * direction from the reference point to towards an emitter.
+     *
+     * Ideally, the implementation should importance sample the product of the
+     * emission profile and the geometry term between the reference point and
+     * the position on the emitter.
+     *
+     * \param ref
+     *    A reference point somewhere within the scene
+     *
+     * \param sample
+     *    A uniformly distributed 2D vector
+     *
+     * \param sample
+     *    A uniformly distributed 1D sample
+     *
+     * \param test_visibility
+     *    When set to \c true, a shadow ray will be cast to ensure that the
+     *    sampled emitter position and the reference point are mutually visible.
+     *
+     * \return
+     *    Radiance received along the sampled ray divided by the sample
+     *    probability.
+     */
     std::pair<DirectionSample3f, Spectrum>
     sample_emitter_direction_pure(const SurfaceInteraction3f &ref,
                              const Point2f &sample,
@@ -131,10 +185,38 @@ public:
                                 const DirectionSample3f &ds,
                                 Mask active = true) const;
 
+    /**
+     * \brief Evaluate the probability density of the  \ref
+     * sample_emitter_direct() technique given an filled-in \ref
+     * DirectionSample record when using a BVH light hierarchy.
+     *
+     * \param ref
+     *    A reference point somewhere within the scene
+     *
+     * \param ds
+     *    A direction sampling record, which specifies the query location.
+     *
+     * \return
+     *    The solid angle density expressed of the sample
+     */
     Float pdf_emitter_direction_custom(const SurfaceInteraction3f &ref,
                                 const DirectionSample3f &ds,
                                 Mask active = true) const;
 
+    /**
+     * \brief Evaluate the probability density of the  \ref
+     * sample_emitter_direct() technique given an filled-in \ref
+     * DirectionSample record when using the \c Emitter integrator.
+     *
+     * \param ref
+     *    A reference point somewhere within the scene
+     *
+     * \param ds
+     *    A direction sampling record, which specifies the query location.
+     *
+     * \return
+     *    The solid angle density expressed of the sample
+     */
     Float pdf_emitter_direction_pure(const SurfaceInteraction3f &ref,
                                 const DirectionSample3f &ds,
                                 Mask active = true) const;
